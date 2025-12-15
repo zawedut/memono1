@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEMO-BOT: REMOTE CORE</title>
+    <style>
+        :root {
+            --bg-color: #050510;
+            --panel-bg: rgba(16, 20, 30, 0.8);
+            --primary-color: #00f3ff;
+            --secondary-color: #ff0055;
+            --text-color: #e0e0e0;
+            --grid-line: rgba(0, 243, 255, 0.1);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            background-image:
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        header {
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid var(--primary-color);
+            text-shadow: 0 0 10px var(--primary-color);
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-badge {
+            padding: 5px 10px;
+            border: 1px solid var(--secondary-color);
+            color: var(--secondary-color);
+            font-weight: bold;
+            box-shadow: 0 0 5px var(--secondary-color);
+            margin-right: 20px;
+        }
+
+        .status-badge.connected {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            box-shadow: 0 0 5px var(--primary-color);
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            width: 95%;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .video-panel {
+            flex: 2;
+            background: var(--panel-bg);
+            border: 1px solid var(--primary-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+
+        #video-canvas {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #000;
+        }
+
+        .overlay-text {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: var(--primary-color);
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px;
+            pointer-events: none;
+        }
+
+        .control-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Chat Box */
+        .chat-box {
+            flex: 1;
+            background: #000;
+            border: 1px solid var(--primary-color);
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: var(--panel-bg);
+            padding: 10px;
+            border-bottom: 1px solid var(--primary-color);
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 13px;
+        }
+
+        .chat-message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+        }
+
+        .chat-message.user {
+            background: rgba(0, 243, 255, 0.1);
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .chat-message.ai {
+            background: rgba(255, 0, 85, 0.1);
+            border-left: 3px solid var(--secondary-color);
+        }
+
+        .chat-input-container {
+            display: flex;
+            border-top: 1px solid var(--grid-line);
+        }
+
+        #chat-input {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.8);
+            border: none;
+            padding: 12px;
+            color: var(--text-color);
+            font-family: inherit;
+            font-size: 14px;
+        }
+
+        #chat-input:focus {
+            outline: none;
+            background: rgba(0, 243, 255, 0.05);
+        }
+
+        #chat-send {
+            background: var(--primary-color);
+            border: none;
+            color: #000;
+            padding: 12px 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #chat-send:hover {
+            background: #fff;
+        }
+
+        .d-pad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 15px;
+            background: var(--panel-bg);
+            border: 1px solid var(--grid-line);
+        }
+
+        .btn {
+            background: transparent;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            padding: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .btn:hover {
+            background: var(--primary-color);
+            color: #000;
+            box-shadow: 0 0 15px var(--primary-color);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .btn-stop {
+            border-color: var(--secondary-color);
+            color: var(--secondary-color);
+        }
+
+        .btn-stop:hover {
+            background: var(--secondary-color);
+            color: #fff;
+            box-shadow: 0 0 15px var(--secondary-color);
+        }
+
+        .hint {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div>SYSTEM: <span style="color:white">MEMO-BOT REMOTE</span></div>
+        <div id="connection-status" class="status-badge">DISCONNECTED</div>
+    </header>
+
+    <div class="main-container">
+        <div class="video-panel">
+            <span class="overlay-text">LIVE FEED :: CAMERA 01</span>
+            <img id="video-canvas" src="" alt="Waiting for stream..." />
+        </div>
+
+        <div class="control-panel">
+            <!-- Chat Box -->
+            <div class="chat-box">
+                <div class="chat-header">💬 MEMO-BOT CHAT (Typhoon AI)</div>
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-message ai">สวัสดีครับ! ผมคือ MEMO-BOT พร้อมช่วยเหลือครับ</div>
+                </div>
+                <div class="chat-input-container">
+                    <input type="text" id="chat-input" placeholder="พิมพ์ข้อความ..." />
+                    <button id="chat-send">ส่ง</button>
+                </div>
+            </div>
+
+            <!-- D-Pad Controls -->
+            <div class="d-pad">
+                <div></div>
+                <div class="btn" onclick="sendCommand('WALK_FORWARD')">▲</div>
+                <div></div>
+
+                <div class="btn" onclick="sendCommand('TURN_LEFT')">◀</div>
+                <div class="btn btn-stop" onclick="sendCommand('STOP')">STOP</div>
+                <div class="btn" onclick="sendCommand('TURN_RIGHT')">▶</div>
+
+                <div></div>
+                <div class="btn" onclick="sendCommand('WALK_BACKWARD')">▼</div>
+                <div></div>
+            </div>
+
+            <div class="hint">WASD = Move | Enter = Send Chat</div>
+        </div>
+    </div>
+
+    <script>
+        const videoImg = document.getElementById('video-canvas');
+        const statusBadge = document.getElementById('connection-status');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const chatSend = document.getElementById('chat-send');
+
+        let ws;
+        const MSG_IMAGE = 1;
+        const MSG_TEXT = 10;
+        const MSG_ACTION = 11;
+        const MSG_AUDIO = 12;
+
+        function addChatMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = 'chat-message ' + type;
+            div.textContent = text;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function connect() {
+            ws = new WebSocket("ws://" + window.location.host + "/ws?role=control");
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = () => {
+                statusBadge.textContent = "CONNECTED";
+                statusBadge.className = "status-badge connected";
+            };
+
+            ws.onclose = () => {
+                statusBadge.textContent = "DISCONNECTED";
+                statusBadge.className = "status-badge";
+                setTimeout(connect, 2000);
+            };
+
+            ws.onmessage = (event) => {
+                const data = new Uint8Array(event.data);
+                const header = data[0];
+                const payload = data.slice(1);
+
+                if (header === MSG_IMAGE) {
+                    const blob = new Blob([payload], { type: 'image/jpeg' });
+                    const url = URL.createObjectURL(blob);
+                    if (videoImg.src) URL.revokeObjectURL(videoImg.src);
+                    videoImg.src = url;
+                }
+                else if (header === MSG_TEXT) {
+                    const text = new TextDecoder().decode(payload);
+                    addChatMessage(text, 'ai');
+                }
+                else if (header === MSG_AUDIO) {
+                    const blob = new Blob([payload], { type: 'audio/mpeg' });
+                    const audio = new Audio(URL.createObjectURL(blob));
+                    audio.play();
+                }
+            };
+        }
+
+        function sendCommand(cmd, type = MSG_ACTION) {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            const encoder = new TextEncoder();
+            const payload = encoder.encode(cmd);
+            const msg = new Uint8Array(1 + payload.length);
+            msg[0] = type;
+            msg.set(payload, 1);
+
+            ws.send(msg);
+        }
+
+        function sendChat() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            addChatMessage(text, 'user');
+            sendCommand(text, MSG_TEXT);
+            chatInput.value = '';
+        }
+
+        // Chat input handlers
+        chatSend.addEventListener('click', sendChat);
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+
+        // Keyboard Controls (WASD)
+        document.addEventListener('keydown', (e) => {
+            if (e.repeat || document.activeElement === chatInput) return;
+            switch (e.key.toLowerCase()) {
+                case 'w': sendCommand('WALK_FORWARD'); break;
+                case 's': sendCommand('WALK_BACKWARD'); break;
+                case 'a': sendCommand('TURN_LEFT'); break;
+                case 'd': sendCommand('TURN_RIGHT'); break;
+                case ' ': sendCommand('STOP'); break;
+            }
+        });
+
+        connect();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,17 @@
+# MEMO-BOT Server Dependencies
+
+# Server
+aiohttp>=3.9.0
+websockets>=12.0
+
+# AI/ML
+torch>=2.0.0
+ultralytics>=8.0.0
+deepface>=0.0.79
+opencv-python>=4.8.0
+
+# Chat & TTS
+edge-tts>=6.1.0
+
+# Utils
+numpy>=1.24.0
