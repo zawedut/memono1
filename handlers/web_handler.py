@@ -37,6 +37,12 @@ class WebHandler:
                                 print("🔊 Triggering Test Audio to Pi...")
                                 if self.pi_handler:
                                     await self.pi_handler.send_test_audio()
+                            
+                            elif payload == "START_MEDICINE":
+                                print("⏰ Triggering Medicine Mode (Scheduler)...")
+                                if self.pi_handler:
+                                    await self.pi_handler.enable_medicine_mode()
+                                    
                             else: # Normal Robot control command
                                 print(f"🎮 Command: {payload}")
                                 if self.pi_handler:

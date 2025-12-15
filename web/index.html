@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MEMO-BOT Control Interface</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
             --bg-color: #f5f7fa;
@@ -17,12 +18,13 @@
             --border-color: #e2e8f0;
             --danger-color: #e53e3e;
             --success-color: #38a169;
+            --warning-color: #dd6b20;
         }
 
         body {
             background-color: var(--bg-color);
             color: var(--text-primary);
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', sans-serif;
             margin: 0;
             height: 100vh;
             display: flex;
@@ -30,7 +32,7 @@
             overflow: hidden;
         }
 
-        /* Header */
+        /* HEADER */
         header {
             background-color: var(--card-bg);
             border-bottom: 1px solid var(--border-color);
@@ -45,7 +47,6 @@
         .brand {
             font-size: 1.25rem;
             font-weight: 600;
-            color: var(--text-primary);
             display: flex;
             align-items: center;
             gap: 10px;
@@ -55,21 +56,10 @@
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 0.85rem;
-            font-weight: 500;
             background-color: #edf2f7;
-            color: var(--text-secondary);
             display: flex;
             align-items: center;
             gap: 6px;
-        }
-
-        .status-badge::before {
-            content: '';
-            display: block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: currentColor;
         }
 
         .status-badge.connected {
@@ -82,82 +72,98 @@
             color: #822727;
         }
 
-        /* Main Layout */
-        .main-container {
+        /* TABS */
+        .tabs {
             display: flex;
+            background: white;
+            padding: 0 30px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            padding: 15px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--accent-color);
+        }
+
+        .tab-btn.active {
+            border-bottom-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        /* CONTENT AREAS */
+        .tab-content {
+            display: none;
             flex: 1;
             padding: 20px;
             gap: 20px;
             overflow: hidden;
         }
 
-        /* Video Section */
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* === VIEW 1: ROBOT CONTROL === */
         .video-section {
-            flex: 1.5;
-            /* Reduced from 2 to make it a bit smaller relative to sidebar */
+            flex: 2.5;
+            /* Increased from 1.5 to make video wider */
             background-color: var(--card-bg);
             border-radius: 12px;
             border: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.01);
-            max-height: 80vh;
-            /* Limit height to keep it contained */
-        }
-
-        .panel-header {
-            padding: 10px 20px;
-            border-bottom: 1px solid var(--border-color);
-            font-weight: 600;
-            color: var(--text-primary);
-            display: flex;
-            justify-content: space-between;
+            /* Ensure it can grow */
+            min-height: 500px;
         }
 
         .video-container {
             flex: 1;
-            background-color: #000;
+            background: #000;
             display: flex;
             justify-content: center;
             align-items: center;
-            position: relative;
-            overflow: hidden;
+            width: 100%;
         }
 
         #video-canvas {
             width: 100%;
             height: 100%;
             object-fit: contain;
-            /* Keeps aspect ratio. Use 'cover' to fill completely but crop. */
+            /* Keeps aspect ratio but fills container */
         }
 
-        /* Sidebar (Controls & Chat) */
         .sidebar {
             flex: 1;
             display: flex;
             flex-direction: column;
             gap: 20px;
-            max-width: 400px;
+            max-width: 350px;
+            /* Reduced slightly to give more space to video */
         }
 
-        /* Controls Card */
         .card {
-            background-color: var(--card-bg);
+            background: var(--card-bg);
             border-radius: 12px;
             border: 1px solid var(--border-color);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
-        .controls-body {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
+        .panel-header {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            background: #f8fafc;
         }
 
         .d-pad {
@@ -165,54 +171,69 @@
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             width: 100%;
-            max-width: 240px;
+            max-width: 200px;
+            margin: 20px auto;
         }
 
         .btn-control {
             aspect-ratio: 1;
             border: 1px solid var(--border-color);
-            background-color: var(--bg-color);
+            background: white;
             border-radius: 8px;
-            font-size: 1.5rem;
-            color: var(--text-primary);
+            font-size: 1.2rem;
             cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
 
         .btn-control:hover {
-            background-color: #e2e8f0;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            background: #e2e8f0;
         }
 
         .btn-control:active {
-            transform: translateY(0);
+            background: #cbd5e0;
         }
 
         .btn-stop {
-            background-color: #fff5f5;
-            border-color: #feb2b2;
+            background: #fff5f5;
             color: var(--danger-color);
-            font-size: 0.9rem;
-            font-weight: 700;
+            border-color: #feb2b2;
+            font-weight: bold;
         }
 
-        .btn-stop:hover {
-            background-color: var(--danger-color);
-            color: white;
-            border-color: var(--danger-color);
+        /* BETTER TIME PICKER */
+        input[type="time"] {
+            font-size: 1.5rem;
+            padding: 10px;
+            border-radius: 8px;
+            border: 2px solid var(--border-color);
+            background: #f8fafc;
+            color: var(--text-primary);
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            font-family: inherit;
         }
 
-        /* Chat Section */
+        input[type="time"]:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            background: white;
+        }
+
+        /* Responsive Fix */
+        @media (max-width: 800px) {
+            .main-container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                max-width: 100%;
+            }
+        }
+
+        /* CHAT */
         .chat-section {
             flex: 1;
-            display: flex;
-            flex-direction: column;
             min-height: 0;
-            /* Important for scroll */
         }
 
         .chat-messages {
@@ -222,311 +243,498 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
-            background-color: #f9fafb;
+            background: #f9fafb;
         }
 
         .message {
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
             max-width: 85%;
-            padding: 10px 14px;
-            border-radius: 12px;
-            font-size: 0.95rem;
-            line-height: 1.4;
         }
 
         .message.ai {
             align-self: flex-start;
-            background-color: white;
+            background: white;
             border: 1px solid var(--border-color);
-            border-bottom-left-radius: 2px;
         }
 
         .message.user {
             align-self: flex-end;
-            background-color: var(--accent-color);
+            background: var(--accent-color);
             color: white;
-            border-bottom-right-radius: 2px;
-            box-shadow: 0 2px 4px rgba(49, 130, 206, 0.2);
         }
 
         .chat-input-area {
-            padding: 15px;
-            border-top: 1px solid var(--border-color);
+            padding: 10px;
             display: flex;
             gap: 10px;
-            background-color: white;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* === VIEW 2: MEDICINE MANAGER === */
+        .medicine-container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            /* display: flex; REMOVED to let tab-content control display */
+            flex-direction: column;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .add-med-form {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: grid;
+            grid-template-columns: 1fr 150px 100px;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 600;
         }
 
         .input-field {
-            flex: 1;
-            padding: 10px 15px;
+            padding: 10px;
             border: 1px solid var(--border-color);
-            border-radius: 8px;
+            border-radius: 6px;
             font-family: inherit;
-            outline: none;
-            transition: border-color 0.2s;
         }
 
         .input-field:focus {
             border-color: var(--accent-color);
-            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+            outline: none;
         }
 
-        .btn-send {
-            padding: 10px 20px;
-            background-color: var(--accent-color);
+        .btn-primary {
+            background: var(--accent-color);
             color: white;
             border: none;
-            border-radius: 8px;
+            padding: 10px 20px;
+            border-radius: 6px;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s;
+            height: 40px;
         }
 
-        .btn-send:hover {
-            background-color: var(--accent-hover);
+        .btn-primary:hover {
+            background: var(--accent-hover);
         }
 
-        /* Keyboard Hint */
-        .keyboard-hint {
-            margin-top: 10px;
-            font-size: 0.8rem;
+        .med-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding-bottom: 20px;
+        }
+
+        .med-item {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+
+        .med-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .med-info {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .med-time {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            background: #edf2f7;
+            padding: 10px 20px;
+            border-radius: 8px;
+        }
+
+        .med-details h3 {
+            margin: 0;
+            font-size: 1.2rem;
+        }
+
+        .med-details p {
+            margin: 5px 0 0;
             color: var(--text-secondary);
-            text-align: center;
         }
 
-        kbd {
-            background-color: #edf2f7;
-            border: 1px solid #cbd5e0;
-            border-radius: 4px;
-            padding: 2px 5px;
-            font-family: monospace;
-            font-size: 0.9em;
+        .med-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-test {
+            background: var(--warning-color);
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-delete {
+            background: #fff5f5;
+            color: var(--danger-color);
+            border: 1px solid #feb2b2;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-delete:hover {
+            background: var(--danger-color);
+            color: white;
+            border-color: var(--danger-color);
+        }
+
+        /* === TOAST NOTIFICATIONS === */
+        .toast-container {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: #333;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 0.95rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            animation: slideUp 0.3s ease-out;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toast.success {
+            background: var(--success-color);
+        }
+
+        .toast.error {
+            background: var(--danger-color);
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
         }
     </style>
 </head>
 
 <body>
+    <div id="toast-container" class="toast-container"></div>
+
     <header>
         <div class="brand">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-            </svg>
-            MEMO-BOT REMOTE
+            <i class="fas fa-robot"></i> MEMO-BOT MANAGER
         </div>
-        <div id="connection-status" class="status-badge disconnected">Disconnected</div>
+        <div id="connection-status" class="status-badge disconnected">
+            <i class="fas fa-wifi"></i> Disconnected
+        </div>
     </header>
 
-    <div class="main-container">
-        <!-- Left Panel: Video -->
-        <div class="video-section">
-            <div class="panel-header">
-                Live Camera Feed
-                <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary)">Camera 01</span>
-            </div>
+    <div class="tabs">
+        <div class="tab-btn active" onclick="switchTab('control')">🤖 Robot Control</div>
+        <div class="tab-btn" onclick="switchTab('medicine')">💊 Medicine Scheduler</div>
+    </div>
+
+    <!-- VIEW 1: ROBOT CONTROL -->
+    <div id="tab-control" class="tab-content active main-container">
+        <div class="video-section" style="flex: 3;"> <!-- LARGE SCREEN -->
+            <div class="panel-header">Live Camera</div>
             <div class="video-container">
-                <img id="video-canvas" src="" alt="Waiting for connection..." />
+                <img id="video-canvas" src="" alt="Waiting for feed..." />
             </div>
         </div>
 
-        <!-- Right Panel: Controls & Chat -->
-        <div class="sidebar">
-
-            <!-- Robot Controls -->
+        <div class="sidebar" style="max-width: 350px;"> <!-- COMPACT SIDEBAR -->
             <div class="card">
-                <div class="panel-header">
-                    Manual Control
-                    <button id="btn-audio" class="status-badge disconnected" style="border:none; cursor:pointer;">
-                        🔇 Enable Audio
-                    </button>
-                    <!-- Test Button to force TTS sending -->
-                    <button id="btn-test-tts" class="status-badge"
-                        style="background:var(--primary); color:black; border:none; cursor:pointer; font-size:10px; padding:2px 5px; margin-left:5px;">
-                        🧪 Test Pi Audio
-                    </button>
-                </div>
-                <div class="controls-body">
-                    <div class="d-pad">
-                        <div></div>
-                        <button class="btn-control" onclick="sendCommand('WALK_FORWARD')">▲</button>
-                        <div></div>
-
-                        <button class="btn-control" onclick="sendCommand('TURN_LEFT')">◀</button>
-                        <button class="btn-control btn-stop" onclick="sendCommand('STOP')">STOP</button>
-                        <button class="btn-control" onclick="sendCommand('TURN_RIGHT')">▶</button>
-
-                        <div></div>
-                        <button class="btn-control" onclick="sendCommand('WALK_BACKWARD')">▼</button>
-                        <div></div>
-                    </div>
-                    <div class="keyboard-hint">
-                        Use <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or Spacebar
-                    </div>
+                <div class="panel-header">Movement</div>
+                <div class="d-pad">
+                    <div></div>
+                    <button class="btn-control" onclick="sendCommand('WALK_FORWARD')"><i
+                            class="fas fa-arrow-up"></i></button>
+                    <div></div>
+                    <button class="btn-control" onclick="sendCommand('TURN_LEFT')"><i
+                            class="fas fa-arrow-left"></i></button>
+                    <button class="btn-control btn-stop" onclick="sendCommand('STOP')">STOP</button>
+                    <button class="btn-control" onclick="sendCommand('TURN_RIGHT')"><i
+                            class="fas fa-arrow-right"></i></button>
+                    <div></div>
+                    <button class="btn-control" onclick="sendCommand('WALK_BACKWARD')"><i
+                            class="fas fa-arrow-down"></i></button>
+                    <div></div>
                 </div>
             </div>
 
-            <!-- Chat -->
             <div class="card chat-section">
-                <div class="panel-header">Typhoon AI Assistant</div>
+                <div class="panel-header">Typhoon AI Chat</div>
                 <div class="chat-messages" id="chat-messages">
-                    <div class="message ai">Hello! I am MEMO-BOT. How can I help you today?</div>
+                    <div class="message ai">Hello! I am ready to help.</div>
                 </div>
                 <div class="chat-input-area">
-                    <input type="text" id="chat-input" class="input-field" placeholder="Type a message..." />
-                    <button id="chat-send" class="btn-send">Send</button>
+                    <input type="text" id="chat-input" class="input-field" style="flex:1"
+                        placeholder="Type message..." />
+                    <button id="chat-send" class="btn-primary" style="padding: 5px 15px;">Send</button>
                 </div>
+                <button id="btn-audio" class="status-badge disconnected"
+                    style="margin: 10px; justify-content:center; cursor:pointer;">
+                    🔇 Enable Audio
+                </button>
             </div>
+
 
         </div>
     </div>
 
+    <!-- VIEW 2: MEDICINE MANAGER -->
+    <div id="tab-medicine" class="tab-content medicine-container">
+        <div class="add-med-form">
+            <div class="form-group">
+                <label>Medicine Name</label>
+                <input type="text" id="med-name" class="input-field" placeholder="Ex: Vitamin C, Heart Pill"
+                    style="font-size: 1.1rem;">
+            </div>
+            <div class="form-group">
+                <label>Time</label>
+                <input type="time" id="med-time" class="input-field" style="font-size: 1.1rem; padding: 8px;">
+            </div>
+            <button id="btn-add-med" class="btn-primary" style="height: 45px; font-size: 1rem;">
+                <i class="fas fa-plus"></i> Add Schedule
+            </button>
+            <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Details / Dosage</label>
+                <input type="text" id="med-details" class="input-field" placeholder="Ex: Take 1 pill after meal">
+            </div>
+        </div>
+
+        <div id="med-list" class="med-list">
+            <!-- JS Populated -->
+        </div>
+    </div>
+
     <script>
+        // --- TOAST NOTIFICATIONS ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            el.className = `toast ${type}`;
+            el.innerHTML = type === 'success' ? '<i class="fas fa-check-circle"></i> ' + message :
+                type === 'error' ? '<i class="fas fa-exclamation-circle"></i> ' + message :
+                    '<i class="fas fa-info-circle"></i> ' + message;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(20px)';
+                setTimeout(() => el.remove(), 300);
+            }, 3000);
+        }
+
+        // --- TABS ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            document.getElementById('tab-' + tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // --- WEBSOCKET ---
         const videoImg = document.getElementById('video-canvas');
         const statusBadge = document.getElementById('connection-status');
         const chatMessages = document.getElementById('chat-messages');
         const chatInput = document.getElementById('chat-input');
-        const chatSend = document.getElementById('chat-send');
         const btnAudio = document.getElementById('btn-audio');
-        const btnTestTTS = document.getElementById('btn-test-tts');
-
         let ws;
         let audioEnabled = false;
-        const MSG_IMAGE = 1;
-        const MSG_TEXT = 10;
-        const MSG_ACTION = 11;
-        const MSG_AUDIO = 12;
-
-        btnAudio.addEventListener('click', () => {
-            audioEnabled = !audioEnabled;
-            if (audioEnabled) {
-                btnAudio.textContent = "🔊 Audio On";
-                btnAudio.className = "status-badge connected";
-                // Play silent sound to unlock audio context
-                new Audio().play().catch(() => { });
-            } else {
-                btnAudio.textContent = "🔇 Enable Audio";
-                btnAudio.className = "status-badge disconnected";
-            }
-        });
-
-        // Test TTS Button
-        btnTestTTS.addEventListener('click', () => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                // Send ACTION (11) + "TEST_AUDIO"
-                const payload = new TextEncoder().encode("TEST_AUDIO");
-                const msg = new Uint8Array(1 + payload.length);
-                msg[0] = MSG_ACTION;
-                msg.set(payload, 1);
-                ws.send(msg);
-                console.log("Sent TEST_AUDIO command");
-            } else {
-                alert("Not connected to server!");
-            }
-        });
-
-        function addChatMessage(text, type) {
-            const div = document.createElement('div');
-            div.className = 'message ' + type;
-            div.textContent = text;
-            chatMessages.appendChild(div);
-            // Scroll to bottom
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
 
         function connect() {
-            // Use relative path for WebSocket to handle both localhost and IP address automatically
             ws = new WebSocket("ws://" + window.location.host + "/ws?role=control");
             ws.binaryType = 'arraybuffer';
-
-            ws.onopen = () => {
-                statusBadge.textContent = "Connected";
-                statusBadge.className = "status-badge connected";
-            };
-
-            ws.onclose = () => {
-                statusBadge.textContent = "Disconnected";
-                statusBadge.className = "status-badge disconnected";
-                setTimeout(connect, 2000); // Auto-reconnect
-            };
-
+            ws.onopen = () => { statusBadge.className = "status-badge connected"; statusBadge.innerHTML = '<i class="fas fa-wifi"></i> Connected'; };
+            ws.onclose = () => { statusBadge.className = "status-badge disconnected"; statusBadge.innerHTML = '<i class="fas fa-slash"></i> Disconnected'; setTimeout(connect, 2000); };
             ws.onmessage = (event) => {
                 const data = new Uint8Array(event.data);
                 const header = data[0];
                 const payload = data.slice(1);
 
-                if (header === MSG_IMAGE) {
+                if (header === 1) { // IMG
                     const blob = new Blob([payload], { type: 'image/jpeg' });
-                    const url = URL.createObjectURL(blob);
-
-                    // Revoke old URL to prevent memory leaks
-                    if (videoImg.src && videoImg.src.startsWith('blob:')) {
-                        URL.revokeObjectURL(videoImg.src);
-                    }
-                    videoImg.src = url;
-                }
-                else if (header === MSG_TEXT) {
-                    const text = new TextDecoder().decode(payload);
-                    addChatMessage(text, 'ai');
-                }
-                else if (header === MSG_AUDIO) {
-                    if (audioEnabled) {
-                        const blob = new Blob([payload], { type: 'audio/wav' });
-                        const audio = new Audio(URL.createObjectURL(blob));
-                        audio.play().catch(e => console.log("Audio play failed:", e));
-                    }
+                    videoImg.src = URL.createObjectURL(blob);
+                } else if (header === 10) { // TEXT
+                    addChatMessage(new TextDecoder().decode(payload), 'ai');
+                } else if (header === 12 && audioEnabled) { // AUDIO
+                    new Audio(URL.createObjectURL(new Blob([payload], { type: 'audio/wav' }))).play().catch(e => { });
+                } else if (header === 20) { // TOAST
+                    const data = JSON.parse(new TextDecoder().decode(payload));
+                    showToast(data.message, data.level || "info");
                 }
             };
         }
 
-        function sendCommand(cmd, type = MSG_ACTION) {
-            if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-            const encoder = new TextEncoder();
-            const payload = encoder.encode(cmd);
-            const msg = new Uint8Array(1 + payload.length);
-            msg[0] = type;
-            msg.set(payload, 1);
-
-            ws.send(msg);
+        function sendCommand(cmd) {
+            if (ws && ws.readyState === 1) ws.send(new Uint8Array([11, ...new TextEncoder().encode(cmd)]));
         }
 
-        function sendChat() {
-            const text = chatInput.value.trim();
-            if (!text) return;
+        function addChatMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = 'message ' + type;
+            div.textContent = type === 'user' ? text : text; // Simplify
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
 
-            addChatMessage(text, 'user');
-            sendCommand(text, MSG_TEXT);
+        document.getElementById('chat-send').onclick = () => {
+            const txt = chatInput.value.trim();
+            if (!txt) return;
+            addChatMessage(txt, 'user');
+            if (ws) ws.send(new Uint8Array([10, ...new TextEncoder().encode(txt)]));
             chatInput.value = '';
+        };
+
+        btnAudio.onclick = () => {
+            audioEnabled = !audioEnabled;
+            btnAudio.textContent = audioEnabled ? "🔊 Audio On" : "🔇 Enable Audio";
+            btnAudio.className = audioEnabled ? "status-badge connected" : "status-badge disconnected";
+            if (audioEnabled) new Audio().play().catch(() => { });
+            showToast(audioEnabled ? "Audio Enabled" : "Audio Muted", audioEnabled ? "success" : "info");
+        };
+
+        // --- MEDICINE SCHEDULER ---
+        const medList = document.getElementById('med-list');
+
+        async function loadSchedules() {
+            try {
+                const res = await fetch('/api/medicines');
+                const data = await res.json();
+                medList.innerHTML = "";
+                data.sort((a, b) => a.time.localeCompare(b.time));
+
+                data.forEach(item => {
+                    const el = document.createElement('div');
+                    el.className = "med-item";
+                    el.innerHTML = `
+                        <div class="med-info">
+                            <div class="med-time">${item.time}</div>
+                            <div class="med-details">
+                                <h3>${item.name}</h3>
+                                <p>${item.details || 'No details provided'}</p>
+                            </div>
+                        </div>
+                        <div class="med-actions">
+                            <button class="btn-test" onclick="testMedicine(${item.id})">
+                                <i class="fas fa-bell"></i> Test Now
+                            </button>
+                            <button class="btn-delete" onclick="deleteMedicine(${item.id})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    `;
+                    medList.appendChild(el);
+                });
+            } catch (e) { console.error(e); }
         }
 
-        // Event Listeners
-        chatSend.addEventListener('click', sendChat);
-        chatInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') sendChat();
-        });
+        document.getElementById('btn-add-med').onclick = async () => {
+            const name = document.getElementById('med-name').value;
+            const time = document.getElementById('med-time').value;
+            const details = document.getElementById('med-details').value;
+            if (!name || !time) return showToast("Please fill in Name and Time", "error");
 
-        // Keyboard Controls
-        document.addEventListener('keydown', (e) => {
-            // Ignore if typing in chat
-            if (e.repeat || document.activeElement === chatInput) return;
+            await fetch('/api/medicines', {
+                method: 'POST', body: JSON.stringify({ name, time, details })
+            });
+            document.getElementById('med-name').value = "";
+            document.getElementById('med-details').value = "";
+            loadSchedules();
+            showToast("Schedule Added!", "success");
+        };
 
-            const key = e.key.toLowerCase();
-            switch (key) {
-                case 'w': sendCommand('WALK_FORWARD'); break;
-                case 's': sendCommand('WALK_BACKWARD'); break;
-                case 'a': sendCommand('TURN_LEFT'); break;
-                case 'd': sendCommand('TURN_RIGHT'); break;
-                case ' ': sendCommand('STOP'); break;
-                case 'arrowup': sendCommand('WALK_FORWARD'); break;
-                case 'arrowdown': sendCommand('WALK_BACKWARD'); break;
-                case 'arrowleft': sendCommand('TURN_LEFT'); break;
-                case 'arrowright': sendCommand('TURN_RIGHT'); break;
+        window.deleteMedicine = async (id) => {
+            if (confirm("Confirm delete?")) {
+                await fetch(`/api/medicines/${id}`, { method: 'DELETE' });
+                loadSchedules();
+                showToast("Schedule Deleted", "info");
             }
+        };
+
+        window.testMedicine = async (id) => {
+            const btn = event.currentTarget;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            btn.disabled = true;
+
+            try {
+                await fetch(`/api/medicines/${id}/test`, { method: 'POST' });
+                showToast("Test Triggered! Listen for voice...", "success");
+            } catch (e) { showToast("Test Failed", "error"); }
+
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }, 2000);
+        };
+
+        // Init
+        connect();
+        loadSchedules();
+
+        // Keyboard
+        document.addEventListener('keydown', (e) => {
+            if (document.activeElement === chatInput) {
+                if (e.key === 'Enter') document.getElementById('chat-send').click();
+                return;
+            }
+            if (e.key.toLowerCase() === 'w') sendCommand('WALK_FORWARD');
+            if (e.key.toLowerCase() === 's') sendCommand('WALK_BACKWARD');
+            if (e.key.toLowerCase() === 'a') sendCommand('TURN_LEFT');
+            if (e.key.toLowerCase() === 'd') sendCommand('TURN_RIGHT');
+            if (e.key === ' ') sendCommand('STOP');
         });
 
-        // Start connection
-        connect();
     </script>
 </body>
 

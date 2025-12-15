@@ -18,14 +18,19 @@ class ChatService:
         print("💬 Chat Service Ready (Typhoon AI)")
         self.models = ["typhoon-v2.5-30b-a3b-instruct", "typhoon-v2.1-12b-instruct"]
     
-    async def chat(self, user_message: str) -> str:
+    async def chat(self, user_message: str, context: str = None) -> str:
         """
         Send message to Typhoon AI and get response
+        :param context: Optional visual context (e.g., "Visible people: Mom")
         """
         # Add user message to history
+        full_message = user_message
+        if context:
+            full_message = f"[Visual Context: {context}] {user_message}"
+        
         self.conversation_history.append({
             "role": "user",
-            "content": user_message
+            "content": full_message
         })
         
         # Keep only last 10 messages for context

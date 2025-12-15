@@ -9,13 +9,17 @@ websockets>=12.0
 torch>=2.0.0
 torchvision
 torchaudio
-tensorflow<2.16
+tensorflow<2.11 # 2.10.0 is last version with native Windows GPU support
+# tf-keras
 ultralytics>=8.0.0
 deepface>=0.0.79
+
+
 opencv-python>=4.8.0
-# Numpy 2.x causes conflicts with current opencv/tensorflow versions
-numpy<2.0.0
+# Python 3.13 requires numpy 2.x (pre-built wheels available)
+numpy<2.0.0 # TF 2.10 requires older numpy
 
 # Chat & TTS
 edge-tts>=6.1.0
 SpeechRecognition>=3.10.0
+
