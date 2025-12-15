@@ -16,6 +16,7 @@ class ChatService:
     def __init__(self):
         self.conversation_history = []
         print("💬 Chat Service Ready (Typhoon AI)")
+        self.models = ["typhoon-v2.5-30b-a3b-instruct", "typhoon-v2.1-12b-instruct"]
     
     async def chat(self, user_message: str) -> str:
         """
@@ -36,40 +37,46 @@ class ChatService:
             {"role": "system", "content": SYSTEM_PROMPT}
         ] + self.conversation_history
         
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    TYPHOON_API_URL,
-                    headers={
-                        "Authorization": f"Bearer {TYPHOON_API_KEY}",
-                        "Content-Type": "application/json"
-                    },
-                    json={
-                        "model": "typhoon-v2-70b-instruct",
-                        "messages": messages,
-                        "max_tokens": 256,
-                        "temperature": 0.7
-                    }
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        ai_response = data["choices"][0]["message"]["content"]
-                        
-                        # Add AI response to history
-                        self.conversation_history.append({
-                            "role": "assistant",
-                            "content": ai_response
-                        })
-                        
-                        return ai_response
-                    else:
-                        error_text = await response.text()
-                        print(f"Typhoon API Error: {response.status} - {error_text}")
-                        return "ขออภัย ระบบมีปัญหาชั่วคราว"
-        
-        except Exception as e:
-            print(f"Chat Error: {e}")
-            return "ขออภัย ไม่สามารถเชื่อมต่อได้"
+        async with aiohttp.ClientSession() as session:
+            for model in self.models:
+                try:
+                    print(f"🔄 Trying Typhoon Model: {model}...")
+                    async with session.post(
+                        TYPHOON_API_URL,
+                        headers={
+                            "Authorization": f"Bearer {TYPHOON_API_KEY}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "model": model,
+                            "messages": messages,
+                            "max_tokens": 256,
+                            "temperature": 0.7
+                        }
+                    ) as response:
+                        if response.status == 200:
+                            data = await response.json()
+                            ai_response = data["choices"][0]["message"]["content"]
+                            
+                            # Add AI response to history
+                            self.conversation_history.append({
+                                "role": "assistant",
+                                "content": ai_response
+                            })
+                            
+                            return ai_response
+                        else:
+                            error_text = await response.text()
+                            print(f"⚠️ Model {model} Failed: {response.status} - {error_text}")
+                            # Continue to next model
+                
+                except Exception as e:
+                    print(f"⚠️ Chat Error ({model}): {e}")
+                    # Continue to next model
+
+        # If all models fail
+        print("❌ All Typhoon models failed.")
+        return "ขออภัย ระบบมีปัญหาชั่วคราว ไม่สามารถตอบกลับได้ในขณะนี้"
     
     def clear_history(self):
         """Clear conversation history"""

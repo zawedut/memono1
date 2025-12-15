@@ -4,6 +4,7 @@ Receives commands and chat messages from web UI
 """
 
 # Message Types
+import aiohttp
 MSG_IMAGE = 1
 MSG_TEXT = 10      # Text chat message
 MSG_ACTION = 11
@@ -19,23 +20,34 @@ class WebHandler:
     
     async def handle(self, ws):
         """Handle web client WebSocket connection"""
-        print(f"🌐 Web Client Connected: {ws.remote_address}")
+        print(f"🌐 Web Client Connected")
         self.web_clients.add(ws)
         
         try:
-            async for message in ws:
-                if isinstance(message, bytes) and len(message) > 1:
-                    header = message[0]
-                    payload = message[1:].decode('utf-8')
-                    
-                    if header == MSG_ACTION:  # Robot control command
-                        print(f"🎮 Command: {payload}")
-                        if self.pi_handler:
-                            self.pi_handler.queue_command(payload)
-                    
-                    elif header == MSG_TEXT:  # Chat message
-                        print(f"💬 Chat: {payload}")
-                        await self._handle_chat(ws, payload)
+            # Standard aiohttp WebSocket loop
+            async for msg in ws:
+                if msg.type == aiohttp.WSMsgType.BINARY:
+                    data = msg.data
+                    if len(data) > 1:
+                        header = data[0]
+                        payload = data[1:].decode('utf-8')
+                        
+                        if header == MSG_ACTION:
+                            if payload == "TEST_AUDIO":  # Special test command
+                                print("🔊 Triggering Test Audio to Pi...")
+                                if self.pi_handler:
+                                    await self.pi_handler.send_test_audio()
+                            else: # Normal Robot control command
+                                print(f"🎮 Command: {payload}")
+                                if self.pi_handler:
+                                    self.pi_handler.queue_command(payload)
+                        
+                        elif header == MSG_TEXT:  # Chat message
+                            print(f"💬 Chat: {payload}")
+                            await self._handle_chat(ws, payload)
+                
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    print(f'Web client connection closed with exception {ws.exception()}')
         
         except Exception as e:
             print(f"Web client error: {e}")
@@ -52,14 +64,25 @@ class WebHandler:
         ai_response = await self.chat_service.chat(user_message)
         print(f"🤖 AI: {ai_response}")
         
-        # Send text response back
+        # Send text response back to web client
         text_msg = bytes([MSG_TEXT]) + ai_response.encode('utf-8')
-        await ws.send(text_msg)
+        await ws.send_bytes(text_msg)
         
         # Generate TTS audio if available
         if self.tts_service:
             audio_data = await self.tts_service.synthesize(ai_response)
             if audio_data:
                 audio_msg = bytes([MSG_AUDIO]) + audio_data
-                await ws.send(audio_msg)
-                print(f"🔊 Sent audio ({len(audio_data)} bytes)")
+                
+                # Send to web client
+                await ws.send_bytes(audio_msg)
+                print(f"🔊 Sent audio to Web ({len(audio_data)} bytes)")
+                
+                # ALSO send to Pi if PiHandler has an active connection
+                if self.pi_handler and hasattr(self.pi_handler, 'ws') and self.pi_handler.ws:
+                    try:
+                        await self.pi_handler.ws.send_bytes(audio_msg)
+                        print(f"📤 Sent audio to Pi ({len(audio_data)} bytes)")
+                    except Exception as e:
+                        print(f"⚠️ Failed to send audio to Pi: {e}")
+

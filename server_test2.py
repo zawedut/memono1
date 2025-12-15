@@ -1,18 +1,14 @@
 """
-MEMO-BOT Server
-- HTTP server for web interface
-- WebSocket server for Pi camera and web control
-- Typhoon AI Chat + TTS
+MEMO-BOT Server (Lite Version)
+- No PyTorch/TensorFlow dependencies
+- Typhoon AI Chat + TTS only
+- Direct video streaming (no object detection)
 """
 import asyncio
 import os
-import torch
 from aiohttp import web
-from ultralytics import YOLO
 
-from services.face_service import FaceService
-from services.medicine_service import MedicineService
-from services.fall_service import FallService
+# Only import lightweight services
 from services.chat_service import ChatService
 from services.tts_service import TTSService
 from handlers.pi_handler import PiHandler
@@ -22,36 +18,24 @@ from handlers.web_handler import WebHandler
 SERVER_IP = "0.0.0.0"
 SERVER_PORT = 8765
 DB_PATH = "my_db"
-MODEL_DIR = "models"
-MED_MODEL_PATH = os.path.join(MODEL_DIR, "best2.pt")
-POSE_MODEL_PATH = os.path.join(MODEL_DIR, "yolov8n-pose.pt")
-
-# ================= GPU SETTINGS =================
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-print(f"🚀 MEMO-BOT Server Starting... Using: {DEVICE.upper()}")
-
-if DEVICE == 'cuda':
-    torch.backends.cudnn.benchmark = True
-
-# ================= LOAD MODELS =================
-print("Loading AI Models...")
-model_med = YOLO(MED_MODEL_PATH)
-model_pose = YOLO(POSE_MODEL_PATH)
-model_med.to(DEVICE)
-model_pose.to(DEVICE)
 
 # ================= INITIALIZE SERVICES =================
-face_service = FaceService(DB_PATH)
-medicine_service = MedicineService(model_med, DEVICE)
-fall_service = FallService(model_pose, DEVICE)
+print("Starting MEMO-BOT Server (Lite Mode)...")
+print("Skipping AI Models (Medicine, Fall, Face)...")
+
+# Initialize Chat & TTS only
 chat_service = ChatService()
 tts_service = TTSService()
 
-# Start face recognition worker
-face_service.start()
+# Pass None for AI services
+face_service = None
+medicine_service = None
+fall_service = None
 
 # ================= SHARED STATE =================
 web_clients = set()
+
+# PiHandler will receive None for AI services and skip processing
 pi_handler = PiHandler(face_service, medicine_service, fall_service, web_clients, chat_service, tts_service)
 web_handler = WebHandler(pi_handler, web_clients, chat_service, tts_service)
 
@@ -102,7 +86,7 @@ async def main():
     
     print(f"📡 Server: http://{SERVER_IP}:{SERVER_PORT}")
     print(f"💬 Chat: Typhoon AI + TTS enabled")
-    print("✅ System Ready!")
+    print("✅ System Ready (Lite Mode)!")
     
     await site.start()
     await asyncio.Future()

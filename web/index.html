@@ -4,269 +4,380 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MEMO-BOT: REMOTE CORE</title>
+    <title>MEMO-BOT Control Interface</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #050510;
-            --panel-bg: rgba(16, 20, 30, 0.8);
-            --primary-color: #00f3ff;
-            --secondary-color: #ff0055;
-            --text-color: #e0e0e0;
-            --grid-line: rgba(0, 243, 255, 0.1);
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-primary: #2d3748;
+            --text-secondary: #718096;
+            --accent-color: #3182ce;
+            --accent-hover: #2b6cb0;
+            --border-color: #e2e8f0;
+            --danger-color: #e53e3e;
+            --success-color: #38a169;
         }
 
         body {
             background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Courier New', Courier, monospace;
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             margin: 0;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            height: 100vh;
             overflow: hidden;
-            background-image:
-                linear-gradient(var(--grid-line) 1px, transparent 1px),
-                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-            background-size: 30px 30px;
         }
 
+        /* Header */
         header {
-            width: 100%;
-            padding: 20px;
-            text-align: center;
-            border-bottom: 2px solid var(--primary-color);
-            text-shadow: 0 0 10px var(--primary-color);
-            background: rgba(0, 0, 0, 0.5);
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 15px 30px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            z-index: 10;
+        }
+
+        .brand {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
         .status-badge {
-            padding: 5px 10px;
-            border: 1px solid var(--secondary-color);
-            color: var(--secondary-color);
-            font-weight: bold;
-            box-shadow: 0 0 5px var(--secondary-color);
-            margin-right: 20px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            background-color: #edf2f7;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-badge::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: currentColor;
         }
 
         .status-badge.connected {
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-            box-shadow: 0 0 5px var(--primary-color);
+            background-color: #c6f6d5;
+            color: #22543d;
         }
 
+        .status-badge.disconnected {
+            background-color: #fed7d7;
+            color: #822727;
+        }
+
+        /* Main Layout */
         .main-container {
             display: flex;
             flex: 1;
-            width: 95%;
-            gap: 20px;
             padding: 20px;
+            gap: 20px;
+            overflow: hidden;
         }
 
-        .video-panel {
-            flex: 2;
-            background: var(--panel-bg);
-            border: 1px solid var(--primary-color);
+        /* Video Section */
+        .video-section {
+            flex: 1.5;
+            /* Reduced from 2 to make it a bit smaller relative to sidebar */
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.01);
+            max-height: 80vh;
+            /* Limit height to keep it contained */
+        }
+
+        .panel-header {
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .video-container {
+            flex: 1;
+            background-color: #000;
             display: flex;
             justify-content: center;
             align-items: center;
             position: relative;
-            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+            overflow: hidden;
         }
 
         #video-canvas {
             width: 100%;
             height: 100%;
             object-fit: contain;
-            background: #000;
+            /* Keeps aspect ratio. Use 'cover' to fill completely but crop. */
         }
 
-        .overlay-text {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            color: var(--primary-color);
-            background: rgba(0, 0, 0, 0.7);
-            padding: 5px;
-            pointer-events: none;
-        }
-
-        .control-panel {
+        /* Sidebar (Controls & Chat) */
+        .sidebar {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 20px;
+            max-width: 400px;
         }
 
-        /* Chat Box */
-        .chat-box {
-            flex: 1;
-            background: #000;
-            border: 1px solid var(--primary-color);
-            border-radius: 5px;
+        /* Controls Card */
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
             display: flex;
             flex-direction: column;
             overflow: hidden;
         }
 
-        .chat-header {
-            background: var(--panel-bg);
-            padding: 10px;
-            border-bottom: 1px solid var(--primary-color);
-            font-weight: bold;
-            color: var(--primary-color);
-        }
-
-        .chat-messages {
-            flex: 1;
-            padding: 10px;
-            overflow-y: auto;
-            font-size: 13px;
-        }
-
-        .chat-message {
-            margin-bottom: 10px;
-            padding: 8px;
-            border-radius: 5px;
-        }
-
-        .chat-message.user {
-            background: rgba(0, 243, 255, 0.1);
-            border-left: 3px solid var(--primary-color);
-        }
-
-        .chat-message.ai {
-            background: rgba(255, 0, 85, 0.1);
-            border-left: 3px solid var(--secondary-color);
-        }
-
-        .chat-input-container {
+        .controls-body {
+            padding: 20px;
             display: flex;
-            border-top: 1px solid var(--grid-line);
-        }
-
-        #chat-input {
-            flex: 1;
-            background: rgba(0, 0, 0, 0.8);
-            border: none;
-            padding: 12px;
-            color: var(--text-color);
-            font-family: inherit;
-            font-size: 14px;
-        }
-
-        #chat-input:focus {
-            outline: none;
-            background: rgba(0, 243, 255, 0.05);
-        }
-
-        #chat-send {
-            background: var(--primary-color);
-            border: none;
-            color: #000;
-            padding: 12px 20px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        #chat-send:hover {
-            background: #fff;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
         }
 
         .d-pad {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            padding: 15px;
-            background: var(--panel-bg);
-            border: 1px solid var(--grid-line);
+            gap: 10px;
+            width: 100%;
+            max-width: 240px;
         }
 
-        .btn {
-            background: transparent;
-            border: 2px solid var(--primary-color);
-            color: var(--primary-color);
-            padding: 12px;
-            font-weight: bold;
+        .btn-control {
+            aspect-ratio: 1;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            border-radius: 8px;
+            font-size: 1.5rem;
+            color: var(--text-primary);
             cursor: pointer;
             transition: all 0.2s;
-            text-align: center;
-            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .btn:hover {
-            background: var(--primary-color);
-            color: #000;
-            box-shadow: 0 0 15px var(--primary-color);
+        .btn-control:hover {
+            background-color: #e2e8f0;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
-        .btn:active {
-            transform: scale(0.95);
+        .btn-control:active {
+            transform: translateY(0);
         }
 
         .btn-stop {
-            border-color: var(--secondary-color);
-            color: var(--secondary-color);
+            background-color: #fff5f5;
+            border-color: #feb2b2;
+            color: var(--danger-color);
+            font-size: 0.9rem;
+            font-weight: 700;
         }
 
         .btn-stop:hover {
-            background: var(--secondary-color);
-            color: #fff;
-            box-shadow: 0 0 15px var(--secondary-color);
+            background-color: var(--danger-color);
+            color: white;
+            border-color: var(--danger-color);
         }
 
-        .hint {
+        /* Chat Section */
+        .chat-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            /* Important for scroll */
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background-color: #f9fafb;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
+
+        .message.ai {
+            align-self: flex-start;
+            background-color: white;
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 2px;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            background-color: var(--accent-color);
+            color: white;
+            border-bottom-right-radius: 2px;
+            box-shadow: 0 2px 4px rgba(49, 130, 206, 0.2);
+        }
+
+        .chat-input-area {
+            padding: 15px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            background-color: white;
+        }
+
+        .input-field {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .input-field:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+
+        .btn-send {
+            padding: 10px 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .btn-send:hover {
+            background-color: var(--accent-hover);
+        }
+
+        /* Keyboard Hint */
+        .keyboard-hint {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
             text-align: center;
-            font-size: 11px;
-            color: #555;
+        }
+
+        kbd {
+            background-color: #edf2f7;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            padding: 2px 5px;
+            font-family: monospace;
+            font-size: 0.9em;
         }
     </style>
 </head>
 
 <body>
     <header>
-        <div>SYSTEM: <span style="color:white">MEMO-BOT REMOTE</span></div>
-        <div id="connection-status" class="status-badge">DISCONNECTED</div>
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            MEMO-BOT REMOTE
+        </div>
+        <div id="connection-status" class="status-badge disconnected">Disconnected</div>
     </header>
 
     <div class="main-container">
-        <div class="video-panel">
-            <span class="overlay-text">LIVE FEED :: CAMERA 01</span>
-            <img id="video-canvas" src="" alt="Waiting for stream..." />
+        <!-- Left Panel: Video -->
+        <div class="video-section">
+            <div class="panel-header">
+                Live Camera Feed
+                <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-secondary)">Camera 01</span>
+            </div>
+            <div class="video-container">
+                <img id="video-canvas" src="" alt="Waiting for connection..." />
+            </div>
         </div>
 
-        <div class="control-panel">
-            <!-- Chat Box -->
-            <div class="chat-box">
-                <div class="chat-header">💬 MEMO-BOT CHAT (Typhoon AI)</div>
+        <!-- Right Panel: Controls & Chat -->
+        <div class="sidebar">
+
+            <!-- Robot Controls -->
+            <div class="card">
+                <div class="panel-header">
+                    Manual Control
+                    <button id="btn-audio" class="status-badge disconnected" style="border:none; cursor:pointer;">
+                        🔇 Enable Audio
+                    </button>
+                    <!-- Test Button to force TTS sending -->
+                    <button id="btn-test-tts" class="status-badge"
+                        style="background:var(--primary); color:black; border:none; cursor:pointer; font-size:10px; padding:2px 5px; margin-left:5px;">
+                        🧪 Test Pi Audio
+                    </button>
+                </div>
+                <div class="controls-body">
+                    <div class="d-pad">
+                        <div></div>
+                        <button class="btn-control" onclick="sendCommand('WALK_FORWARD')">▲</button>
+                        <div></div>
+
+                        <button class="btn-control" onclick="sendCommand('TURN_LEFT')">◀</button>
+                        <button class="btn-control btn-stop" onclick="sendCommand('STOP')">STOP</button>
+                        <button class="btn-control" onclick="sendCommand('TURN_RIGHT')">▶</button>
+
+                        <div></div>
+                        <button class="btn-control" onclick="sendCommand('WALK_BACKWARD')">▼</button>
+                        <div></div>
+                    </div>
+                    <div class="keyboard-hint">
+                        Use <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> or Spacebar
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat -->
+            <div class="card chat-section">
+                <div class="panel-header">Typhoon AI Assistant</div>
                 <div class="chat-messages" id="chat-messages">
-                    <div class="chat-message ai">สวัสดีครับ! ผมคือ MEMO-BOT พร้อมช่วยเหลือครับ</div>
+                    <div class="message ai">Hello! I am MEMO-BOT. How can I help you today?</div>
                 </div>
-                <div class="chat-input-container">
-                    <input type="text" id="chat-input" placeholder="พิมพ์ข้อความ..." />
-                    <button id="chat-send">ส่ง</button>
+                <div class="chat-input-area">
+                    <input type="text" id="chat-input" class="input-field" placeholder="Type a message..." />
+                    <button id="chat-send" class="btn-send">Send</button>
                 </div>
             </div>
 
-            <!-- D-Pad Controls -->
-            <div class="d-pad">
-                <div></div>
-                <div class="btn" onclick="sendCommand('WALK_FORWARD')">▲</div>
-                <div></div>
-
-                <div class="btn" onclick="sendCommand('TURN_LEFT')">◀</div>
-                <div class="btn btn-stop" onclick="sendCommand('STOP')">STOP</div>
-                <div class="btn" onclick="sendCommand('TURN_RIGHT')">▶</div>
-
-                <div></div>
-                <div class="btn" onclick="sendCommand('WALK_BACKWARD')">▼</div>
-                <div></div>
-            </div>
-
-            <div class="hint">WASD = Move | Enter = Send Chat</div>
         </div>
     </div>
 
@@ -276,34 +387,67 @@
         const chatMessages = document.getElementById('chat-messages');
         const chatInput = document.getElementById('chat-input');
         const chatSend = document.getElementById('chat-send');
+        const btnAudio = document.getElementById('btn-audio');
+        const btnTestTTS = document.getElementById('btn-test-tts');
 
         let ws;
+        let audioEnabled = false;
         const MSG_IMAGE = 1;
         const MSG_TEXT = 10;
         const MSG_ACTION = 11;
         const MSG_AUDIO = 12;
 
+        btnAudio.addEventListener('click', () => {
+            audioEnabled = !audioEnabled;
+            if (audioEnabled) {
+                btnAudio.textContent = "🔊 Audio On";
+                btnAudio.className = "status-badge connected";
+                // Play silent sound to unlock audio context
+                new Audio().play().catch(() => { });
+            } else {
+                btnAudio.textContent = "🔇 Enable Audio";
+                btnAudio.className = "status-badge disconnected";
+            }
+        });
+
+        // Test TTS Button
+        btnTestTTS.addEventListener('click', () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                // Send ACTION (11) + "TEST_AUDIO"
+                const payload = new TextEncoder().encode("TEST_AUDIO");
+                const msg = new Uint8Array(1 + payload.length);
+                msg[0] = MSG_ACTION;
+                msg.set(payload, 1);
+                ws.send(msg);
+                console.log("Sent TEST_AUDIO command");
+            } else {
+                alert("Not connected to server!");
+            }
+        });
+
         function addChatMessage(text, type) {
             const div = document.createElement('div');
-            div.className = 'chat-message ' + type;
+            div.className = 'message ' + type;
             div.textContent = text;
             chatMessages.appendChild(div);
+            // Scroll to bottom
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
         function connect() {
+            // Use relative path for WebSocket to handle both localhost and IP address automatically
             ws = new WebSocket("ws://" + window.location.host + "/ws?role=control");
             ws.binaryType = 'arraybuffer';
 
             ws.onopen = () => {
-                statusBadge.textContent = "CONNECTED";
+                statusBadge.textContent = "Connected";
                 statusBadge.className = "status-badge connected";
             };
 
             ws.onclose = () => {
-                statusBadge.textContent = "DISCONNECTED";
-                statusBadge.className = "status-badge";
-                setTimeout(connect, 2000);
+                statusBadge.textContent = "Disconnected";
+                statusBadge.className = "status-badge disconnected";
+                setTimeout(connect, 2000); // Auto-reconnect
             };
 
             ws.onmessage = (event) => {
@@ -314,7 +458,11 @@
                 if (header === MSG_IMAGE) {
                     const blob = new Blob([payload], { type: 'image/jpeg' });
                     const url = URL.createObjectURL(blob);
-                    if (videoImg.src) URL.revokeObjectURL(videoImg.src);
+
+                    // Revoke old URL to prevent memory leaks
+                    if (videoImg.src && videoImg.src.startsWith('blob:')) {
+                        URL.revokeObjectURL(videoImg.src);
+                    }
                     videoImg.src = url;
                 }
                 else if (header === MSG_TEXT) {
@@ -322,9 +470,11 @@
                     addChatMessage(text, 'ai');
                 }
                 else if (header === MSG_AUDIO) {
-                    const blob = new Blob([payload], { type: 'audio/mpeg' });
-                    const audio = new Audio(URL.createObjectURL(blob));
-                    audio.play();
+                    if (audioEnabled) {
+                        const blob = new Blob([payload], { type: 'audio/wav' });
+                        const audio = new Audio(URL.createObjectURL(blob));
+                        audio.play().catch(e => console.log("Audio play failed:", e));
+                    }
                 }
             };
         }
@@ -350,24 +500,32 @@
             chatInput.value = '';
         }
 
-        // Chat input handlers
+        // Event Listeners
         chatSend.addEventListener('click', sendChat);
         chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') sendChat();
         });
 
-        // Keyboard Controls (WASD)
+        // Keyboard Controls
         document.addEventListener('keydown', (e) => {
+            // Ignore if typing in chat
             if (e.repeat || document.activeElement === chatInput) return;
-            switch (e.key.toLowerCase()) {
+
+            const key = e.key.toLowerCase();
+            switch (key) {
                 case 'w': sendCommand('WALK_FORWARD'); break;
                 case 's': sendCommand('WALK_BACKWARD'); break;
                 case 'a': sendCommand('TURN_LEFT'); break;
                 case 'd': sendCommand('TURN_RIGHT'); break;
                 case ' ': sendCommand('STOP'); break;
+                case 'arrowup': sendCommand('WALK_FORWARD'); break;
+                case 'arrowdown': sendCommand('WALK_BACKWARD'); break;
+                case 'arrowleft': sendCommand('TURN_LEFT'); break;
+                case 'arrowright': sendCommand('TURN_RIGHT'); break;
             }
         });
 
+        // Start connection
         connect();
     </script>
 </body>
