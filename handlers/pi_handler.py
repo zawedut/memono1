@@ -42,6 +42,12 @@ class PiHandler:
         self.ws = ws # Store for proactively sending messages
         self.audio_buffer = bytearray() # Clear buffer on new connection
         
+        # Broadcast Connection to Web
+        await self.broadcast_toast("Robot Connected!", "success")
+        await self.broadcast_robot_status(True)
+        
+
+        
         # Start command sender task
         sender_task = asyncio.create_task(self._send_commands(ws))
         # Start audio processor task
@@ -250,6 +256,20 @@ class PiHandler:
             except Exception:
                 pass
             print("🔴 Pi Disconnected")
+            await self.broadcast_robot_status(False)
+            await self.broadcast_toast("Robot Disconnected", "error")
+
+    async def broadcast_robot_status(self, connected: bool):
+        """Send Robot Status to Web"""
+        # Header 21 = ROBOT_STATUS
+        payload = json.dumps({"type": "status", "robot_connected": connected}).encode('utf-8')
+        msg = bytes([21]) + payload
+        
+        disconnected = set()
+        for client in set(self.web_clients):
+            try: await client.send_bytes(msg)
+            except: disconnected.add(client)
+        self.web_clients -= disconnected
 
     async def _process_audio_buffer(self, ws):
         """Monitor audio buffer and process when silence detected"""
@@ -369,6 +389,18 @@ class PiHandler:
         for client in self.web_clients:
             try: await client.send_bytes(msg)
             except: pass
+            
+    async def broadcast_robot_status(self, connected: bool):
+        """Send Robot Status to Web"""
+        # Header 21 = ROBOT_STATUS
+        payload = json.dumps({"type": "status", "robot_connected": connected}).encode('utf-8')
+        msg = bytes([21]) + payload
+        
+        disconnected = set()
+        for client in set(self.web_clients):
+            try: await client.send_bytes(msg)
+            except: disconnected.add(client)
+        self.web_clients -= disconnected
     
     async def _broadcast_frame(self, frame):
         """Broadcast frame to all web clients"""

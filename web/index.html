@@ -540,7 +540,18 @@
             </div>
             <div class="form-group">
                 <label>Time</label>
-                <input type="time" id="med-time" class="input-field" style="font-size: 1.1rem; padding: 8px;">
+                <!-- NEW: Dropdown Time Picker (Easier to use) -->
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <select id="med-hour" class="input-field"
+                        style="flex:1; padding: 10px; font-size: 1.2rem; text-align: center;">
+                        <!-- JS Fill -->
+                    </select>
+                    <span style="font-size: 1.5rem; font-weight: bold;">:</span>
+                    <select id="med-minute" class="input-field"
+                        style="flex:1; padding: 10px; font-size: 1.2rem; text-align: center;">
+                        <!-- JS Fill -->
+                    </select>
+                </div>
             </div>
             <button id="btn-add-med" class="btn-primary" style="height: 45px; font-size: 1rem;">
                 <i class="fas fa-plus"></i> Add Schedule
@@ -594,26 +605,67 @@
         function connect() {
             ws = new WebSocket("ws://" + window.location.host + "/ws?role=control");
             ws.binaryType = 'arraybuffer';
-            ws.onopen = () => { statusBadge.className = "status-badge connected"; statusBadge.innerHTML = '<i class="fas fa-wifi"></i> Connected'; };
-            ws.onclose = () => { statusBadge.className = "status-badge disconnected"; statusBadge.innerHTML = '<i class="fas fa-slash"></i> Disconnected'; setTimeout(connect, 2000); };
-            ws.onmessage = (event) => {
+
+            ws.onopen = () => {
+                // Connected to SERVER, but waiting for ROBOT
+                statusBadge.className = "status-badge disconnected";
+                statusBadge.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Waiting for Robot...';
+                statusBadge.style.backgroundColor = "#f59e0b"; // Yellow (Tailwind amber-500)
+            };
+
+            ws.onclose = () => {
+                statusBadge.className = "status-badge disconnected";
+                statusBadge.innerHTML = '<i class="fas fa-slash"></i> Server Disconnected';
+                statusBadge.style.backgroundColor = ""; // Reset
+                setTimeout(connect, 2000);
+            };
+            ws.onmessage = async (event) => {
                 const data = new Uint8Array(event.data);
                 const header = data[0];
                 const payload = data.slice(1);
 
-                if (header === 1) { // IMG
-                    const blob = new Blob([payload], { type: 'image/jpeg' });
-                    videoImg.src = URL.createObjectURL(blob);
-                } else if (header === 10) { // TEXT
-                    addChatMessage(new TextDecoder().decode(payload), 'ai');
-                } else if (header === 12 && audioEnabled) { // AUDIO
-                    new Audio(URL.createObjectURL(new Blob([payload], { type: 'audio/wav' }))).play().catch(e => { });
-                } else if (header === 20) { // TOAST
-                    const data = JSON.parse(new TextDecoder().decode(payload));
-                    showToast(data.message, data.level || "info");
+                if (header === 1) { // IMAGE (MJPEG Frame)
+                    const blob = new Blob([payload], { type: "image/jpeg" });
+                    const url = URL.createObjectURL(blob);
+                    videoImg.onload = () => URL.revokeObjectURL(url);
+                    videoImg.src = url;
+                }
+                else if (header === 10) { // TEXT MESSAGE
+                    const dec = new TextDecoder();
+                    const text = dec.decode(payload);
+                    addChatMessage(text, text.startsWith("AI:") ? 'ai' : 'user');
+                }
+                else if (header === 12 && audioEnabled) { // AUDIO (WAV)
+                    const blob = new Blob([payload], { type: "audio/wav" });
+                    const url = URL.createObjectURL(blob);
+                    new Audio(url).play().catch(e => console.log("Audio play error", e));
+                }
+                else if (header === 20) { // TOAST
+                    try {
+                        const dec = new TextDecoder();
+                        const json = JSON.parse(dec.decode(payload));
+                        showToast(json.message, json.level);
+                    } catch (e) { }
+                }
+                else if (header === 21) { // ROBOT STATUS (New)
+                    try {
+                        const dec = new TextDecoder();
+                        const msg = JSON.parse(dec.decode(payload));
+                        if (msg.type === "status") {
+                            if (msg.robot_connected) {
+                                statusBadge.className = "status-badge connected";
+                                statusBadge.innerHTML = '<i class="fas fa-robot"></i> Robot Ready';
+                                statusBadge.style.backgroundColor = "";
+                            } else {
+                                statusBadge.className = "status-badge disconnected";
+                                statusBadge.innerHTML = '<i class="fas fa-plug"></i> Robot Disconnected';
+                                statusBadge.style.backgroundColor = "#ef4444";
+                            }
+                        }
+                    } catch (e) { }
                 }
             };
-        }
+        } // End connect()
 
         function sendCommand(cmd) {
             if (ws && ws.readyState === 1) ws.send(new Uint8Array([11, ...new TextEncoder().encode(cmd)]));
@@ -680,9 +732,13 @@
 
         document.getElementById('btn-add-med').onclick = async () => {
             const name = document.getElementById('med-name').value;
-            const time = document.getElementById('med-time').value;
+            // Get Time from Dropdowns
+            const hh = document.getElementById('med-hour').value;
+            const mm = document.getElementById('med-minute').value;
+            const time = `${hh}:${mm}`;
+
             const details = document.getElementById('med-details').value;
-            if (!name || !time) return showToast("Please fill in Name and Time", "error");
+            if (!name) return showToast("Please enter medicine name", "error");
 
             await fetch('/api/medicines', {
                 method: 'POST', body: JSON.stringify({ name, time, details })
@@ -735,7 +791,31 @@
             if (e.key === ' ') sendCommand('STOP');
         });
 
+        // Initialize Time Picker Dropdowns
+        function initTimePicker() {
+            const h = document.getElementById('med-hour');
+            const m = document.getElementById('med-minute');
+            if (!h || !m) return;
+
+            // Hours (00-23)
+            for (let i = 0; i < 24; i++) {
+                let val = i.toString().padStart(2, '0');
+                let opt = document.createElement('option');
+                opt.value = val; opt.innerText = val;
+                h.appendChild(opt);
+            }
+            // Minutes (00-59)
+            for (let i = 0; i < 60; i++) {
+                let val = i.toString().padStart(2, '0');
+                let opt = document.createElement('option');
+                opt.value = val; opt.innerText = val;
+                m.appendChild(opt);
+            }
+            // Set Default to Now
+            let now = new Date();
+            h.value = now.getHours().toString().padStart(2, '0');
+            m.value = now.getMinutes().toString().padStart(2, '0');
+        }
+        initTimePicker();
     </script>
 </body>
-
-</html>

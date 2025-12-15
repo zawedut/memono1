@@ -62,23 +62,56 @@ if DEVICE != 'cuda':
     print("⚠️ WARNING: GPU not available! Performance will be slow.")
     print("   Make sure CUDA is installed and GPU drivers are up to date.")
 
-# ================= LOAD MODELS =================
-print("Loading AI Models...")
-model_med = YOLO(MED_MODEL_PATH)
-model_pose = YOLO(POSE_MODEL_PATH)
-model_med.to(DEVICE)
-model_pose.to(DEVICE)
+# ================= SYSTEM STARTUP CHECK =================
+print("\n🔍 STARTING SYSTEM DIAGNOSTICS...")
+print("---------------------------------------")
 
-# ================= INITIALIZE SERVICES =================
-face_service = FaceService(DB_PATH)
-# Use original Medicine Service (model-based) as requested in last step
-medicine_service = MedicineService(model_med, DEVICE) 
-fall_service = FallService(model_pose, DEVICE)
-chat_service = ChatService()
-tts_service = TTSService()
+system_ready = True
 
-# Start face recognition worker
-face_service.start()
+# 1. CHECK GPU
+if DEVICE == 'cuda':
+    print("✅ [PASS] GPU Acceleration (CUDA)")
+else:
+    print("⚠️ [WARN] GPU Not Found (Using CPU)")
+
+# 2. CHECK MODELS
+try:
+    print("⏳ [CHECK] Loading AI Models...")
+    if not os.path.exists(MED_MODEL_PATH): raise FileNotFoundError(f"Missing {MED_MODEL_PATH}")
+    if not os.path.exists(POSE_MODEL_PATH): raise FileNotFoundError(f"Missing {POSE_MODEL_PATH}")
+    
+    model_med = YOLO(MED_MODEL_PATH)
+    model_med.to(DEVICE)
+    model_pose = YOLO(POSE_MODEL_PATH)
+    model_pose.to(DEVICE)
+    print("✅ [PASS] YOLO Models Loaded")
+except Exception as e:
+    print(f"❌ [FAIL] Model Loading: {e}")
+    system_ready = False
+
+# 3. CHECK SERVICES
+try:
+    print("⏳ [CHECK] Initializing Services...")
+    face_service = FaceService(DB_PATH)
+    medicine_service = MedicineService(model_med, DEVICE) 
+    fall_service = FallService(model_pose, DEVICE)
+    chat_service = ChatService()
+    tts_service = TTSService()
+    
+    # Start Workers
+    face_service.start()
+    print("✅ [PASS] All AI Services Initialized")
+except Exception as e:
+    print(f"❌ [FAIL] Service Init: {e}")
+    system_ready = False
+
+print("---------------------------------------")
+if not system_ready:
+    print("🛑 SYSTEM HAS ERRORS. STARTING ANYWAY BUT EXPECT ISSUES.")
+    time.sleep(2)
+else:
+    print("✅ SYSTEM INTEGRITY CHECK PASSED")
+print("---------------------------------------\n")
 
 # ================= SHARED STATE =================
 web_clients = set()
@@ -230,6 +263,8 @@ async def main():
     print(f"📡 Server: http://{SERVER_IP}:{SERVER_PORT}")
     print(f"💬 Chat: Typhoon AI + TTS enabled")
     print("✅ System Ready!")
+    print("⏳ Waiting for Raspberry Pi connection...")
+    print("---------------------------------------")
     
     # Auto-Open Browser
     try:
