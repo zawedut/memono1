@@ -84,15 +84,28 @@ class LocalRobotHandler:
         if self.tts_service:
             audio_data = await self.tts_service.synthesize(text)
             if audio_data:
-                # 1. Play Locally (Windows)
+                # 1. Play Locally (Windows) - edge-tts outputs MP3, not WAV
                 try:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as f:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
                         f.write(audio_data)
                         temp_path = f.name
                     
-                    # Play in thread to not block
+                    # Play in thread to not block using pygame (supports MP3)
                     def _play():
-                        os.system(f'powershell -c (New-Object Media.SoundPlayer "{temp_path}").PlaySync(); rm "{temp_path}"')
+                        try:
+                            import pygame
+                            pygame.mixer.init()
+                            pygame.mixer.music.load(temp_path)
+                            pygame.mixer.music.play()
+                            while pygame.mixer.music.get_busy():
+                                time.sleep(0.1)
+                            pygame.mixer.quit()
+                        except ImportError:
+                            # Fallback to ffplay if pygame not available
+                            os.system(f'ffplay -nodisp -autoexit -loglevel quiet "{temp_path}"')
+                        finally:
+                            try: os.remove(temp_path)
+                            except: pass
                     threading.Thread(target=_play).start()
                 except Exception as e:
                     print(f"Audio Play Error: {e}")

@@ -7,6 +7,10 @@ import aiohttp
 import cv2
 import numpy as np
 import time
+import os
+import tempfile
+import threading
+import json
 import speech_recognition as sr
 from services.line_service import LineService
 
@@ -35,6 +39,32 @@ class PiHandler:
         self.use_face = True
         self.use_fall = True
         self.use_med = True
+    
+    def _play_audio_locally(self, audio_data):
+        """Play audio on Server PC using pygame (Same as test_all_ai.py)"""
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
+                f.write(audio_data)
+                temp_path = f.name
+            
+            def _play():
+                try:
+                    import pygame
+                    pygame.mixer.init()
+                    pygame.mixer.music.load(temp_path)
+                    pygame.mixer.music.play()
+                    while pygame.mixer.music.get_busy():
+                        time.sleep(0.1)
+                    pygame.mixer.quit()
+                except ImportError:
+                    # Fallback to ffplay if pygame not available
+                    os.system(f'ffplay -nodisp -autoexit -loglevel quiet "{temp_path}"')
+                finally:
+                    try: os.remove(temp_path)
+                    except: pass
+            threading.Thread(target=_play, daemon=True).start()
+        except Exception as e:
+            print(f"Audio Play Error: {e}")
     
     async def handle(self, ws):
         """Handle Pi WebSocket connection"""
@@ -121,6 +151,9 @@ class PiHandler:
                             if self.tts_service:
                                 tts_audio = await self.tts_service.synthesize("แจ้งเตือน ตรวจพบการล้มค่ะ Warning! Fall Detected.")
                                 if tts_audio:
+                                    # Play on Server PC
+                                    self._play_audio_locally(tts_audio)
+                                    # Also send to Pi
                                     try: await self.ws.send_bytes(bytes([12]) + tts_audio)
                                     except: pass
                     
@@ -223,6 +256,8 @@ class PiHandler:
                                 if self.tts_service:
                                     tts_audio = await self.tts_service.synthesize(ai_response)
                                     if tts_audio:
+                                        # Play on Server PC
+                                        self._play_audio_locally(tts_audio)
                                         try:
                                             print(f"📤 Sending TTS to Pi ({len(tts_audio)} bytes)")
                                             await ws.send_bytes(bytes([12]) + tts_audio)
@@ -341,6 +376,8 @@ class PiHandler:
                                 print(f"🔊 Generating TTS for: '{ai_response[:20]}...'")
                                 tts_audio = await self.tts_service.synthesize(ai_response)
                                 if tts_audio:
+                                    # Play on Server PC
+                                    self._play_audio_locally(tts_audio)
                                     # Send to Pi (Header 12 for Audio)
                                     try:
                                         msg = bytes([12]) + tts_audio
@@ -469,9 +506,15 @@ class PiHandler:
             
         # Voice Announcement
         if self.tts_service:
-            await self.ws.send_bytes(bytes([12]) + await self.tts_service.synthesize("ได้เวลากินยาแล้วค่ะ Please take your medicine."))
+            tts_audio = await self.tts_service.synthesize("ได้เวลากินยาแล้วค่ะ Please take your medicine.")
+            if tts_audio:
+                # Play on Server PC
+                self._play_audio_locally(tts_audio)
+                # Send to Pi
+                try: await self.ws.send_bytes(bytes([12]) + tts_audio)
+                except: pass
 
-    def disable_medicine_mode(self, reason="Stop"):
+    async def disable_medicine_mode(self, reason="Stop"):
         """Turn off Medicine Detection"""
         if not self.medicine_active: return
         

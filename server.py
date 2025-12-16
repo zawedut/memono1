@@ -15,6 +15,8 @@ import os
 import json
 import time
 import webbrowser
+import tempfile
+import threading
 from datetime import datetime
 from aiohttp import web
 from ultralytics import YOLO
@@ -55,6 +57,31 @@ def save_schedules():
             json.dump(medicine_schedules, f, indent=4)
     except Exception as e:
         print(f"⚠️ Schedule save error: {e}")
+
+def play_audio_locally(audio_data):
+    """Play TTS audio on Server PC using pygame (Same as test_all_ai.py)"""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as f:
+            f.write(audio_data)
+            temp_path = f.name
+        
+        def _play():
+            try:
+                import pygame
+                pygame.mixer.init()
+                pygame.mixer.music.load(temp_path)
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy():
+                    time.sleep(0.1)
+                pygame.mixer.quit()
+            except ImportError:
+                os.system(f'ffplay -nodisp -autoexit -loglevel quiet "{temp_path}"')
+            finally:
+                try: os.remove(temp_path)
+                except: pass
+        threading.Thread(target=_play, daemon=True).start()
+    except Exception as e:
+        print(f"Audio Play Error: {e}")
 
 # ================= VERIFY GPU =================
 print(f"\n🚀 MEMO-BOT Server Starting... Using: {DEVICE.upper()}")
@@ -184,10 +211,14 @@ async def api_test_medicine(request):
         if tts_service:
             text = f"ทดสอบระบบกินยา นี่คือเสียงเตือนสำหรับ {item['name']} ค่ะ Testing alarm for {item['name']}."
             audio = await tts_service.synthesize(text)
-            if audio and pi_handler.ws:
-                try:
-                    await pi_handler.ws.send_bytes(bytes([12]) + audio)
-                except: pass
+            if audio:
+                # Play on Server PC
+                play_audio_locally(audio)
+                # Also send to Pi if connected
+                if pi_handler.ws:
+                    try:
+                        await pi_handler.ws.send_bytes(bytes([12]) + audio)
+                    except: pass
                 
         return web.Response(text="Test Triggered")
     except Exception as e:
@@ -233,10 +264,14 @@ async def scheduler_loop():
                         
                         # Generate specific audio
                         audio = await tts_service.synthesize(text)
-                        if audio and pi_handler.ws:
-                             try:
-                                 await pi_handler.ws.send_bytes(bytes([12]) + audio)
-                             except: pass
+                        if audio:
+                            # Play on Server PC
+                            play_audio_locally(audio)
+                            # Also send to Pi if connected
+                            if pi_handler.ws:
+                                try:
+                                    await pi_handler.ws.send_bytes(bytes([12]) + audio)
+                                except: pass
 
         await asyncio.sleep(10) # Check every 10s
 
