@@ -18,6 +18,8 @@ from deepface import DeepFace
 DB_PATH = "my_db"
 CONFIRM_FRAMES = 5    # Frames to confirm identity
 DISTANCE_THRESH = 100 # Tracking distance threshold
+LOCK_DURATION = 60    # Seconds to keep locked identity (ล็อคไว้ 60 วินาที)
+MAX_MISSING_FRAMES = 30  # Max frames before removing unlocked person
 
 class TrackedPerson:
     def __init__(self, face_box):
@@ -26,6 +28,7 @@ class TrackedPerson:
         self.confidence_count = 0 # Match Counter
         self.is_locked = False    # Name Locked?
         self.missing_frames = 0   # For handling occlusion
+        self.lock_time = None     # Time when locked (for persistent lock)
 
     def update_position(self, new_box):
         self.box = new_box
@@ -43,7 +46,8 @@ class TrackedPerson:
 
         if self.confidence_count >= CONFIRM_FRAMES and self.id_name != "Unknown":
             self.is_locked = True
-            print(f"🔒 LOCKED: {self.id_name}")
+            self.lock_time = time.time()  # บันทึกเวลาที่ล็อค
+            print(f"🔒 LOCKED: {self.id_name} (will stay locked for {LOCK_DURATION}s)")
 
 class FaceService:
     def __init__(self, db_path="my_db"):
@@ -166,9 +170,38 @@ class FaceService:
                     
                     current_frame_people.append(matched_person)
 
-                # 5. Cleanup
+                # 5. Cleanup - Keep locked people longer
                 with self.lock:
-                    self.active_people = [p for p in self.active_people if p in current_frame_people]
+                    current_time = time.time()
+                    cleaned_people = []
+                    
+                    for person in self.active_people:
+                        in_frame = person in current_frame_people
+                        
+                        if in_frame:
+                            # คนที่ยังอยู่ในเฟรม - เก็บไว้
+                            person.missing_frames = 0
+                            cleaned_people.append(person)
+                        elif person.is_locked:
+                            # คนที่ล็อคแล้วแต่หายไปจากเฟรม
+                            person.missing_frames += 1
+                            
+                            # เช็คว่าล็อคหมดเวลาหรือยัง
+                            lock_expired = (current_time - person.lock_time) > LOCK_DURATION if person.lock_time else False
+                            too_long_missing = person.missing_frames > MAX_MISSING_FRAMES
+                            
+                            if lock_expired or too_long_missing:
+                                print(f"🔓 UNLOCK: {person.id_name} (expired={lock_expired}, missing={too_long_missing})")
+                            else:
+                                # ยังล็อคอยู่ - เก็บไว้แม้ไม่เห็นหน้า
+                                cleaned_people.append(person)
+                        else:
+                            # คนที่ยังไม่ล็อคและหายไป - ลบออก
+                            person.missing_frames += 1
+                            if person.missing_frames <= 5:  # ให้โอกาส 5 เฟรม
+                                cleaned_people.append(person)
+                    
+                    self.active_people = cleaned_people
 
                 time.sleep(0.01) # Small sleep to prevent CPU hogging
             
