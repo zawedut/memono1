@@ -35,6 +35,10 @@ class PiHandler:
         self.medicine_start_time = 0
         self.MEDICINE_TIMEOUT = 300 # 5 Minutes Auto-Stop
         
+        # Fall Detection Cooldown
+        self.last_fall_alert_time = 0
+        self.FALL_ALERT_COOLDOWN = 5  # 5 seconds cooldown for LINE/TTS alerts
+        
         # Runtime Toggles
         self.use_face = True
         self.use_fall = True
@@ -99,70 +103,61 @@ class PiHandler:
                     # Resize
                     frame = cv2.resize(frame, (640, 480))
                     
+                    # Create a single display frame for all annotations
+                    display_frame = frame.copy()
+                    
                     # Update face service with new frame if available
                     if self.face_service and self.use_face:
                         self.face_service.update_frame(frame)
                     
-                    # Process through AI services if available, otherwise just use raw frame
-                    frame_med = frame.copy()
-                    frame_fall = frame.copy()
-                    frame_face = frame.copy()
-                    
+                    # 1. Process Medicine (draw on display_frame)
                     if self.medicine_service:
-                        # Only run Medicine Service if Active (Scheduled)
                         if self.medicine_active and self.use_med:
-                            frame_med = self.medicine_service.process(frame)
-                            # Show Active Status
-                            cv2.putText(frame_med, "Medicine Mode: ACTIVE", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                            display_frame = self.medicine_service.process(display_frame)
+                            cv2.putText(display_frame, "Medicine Mode: ACTIVE", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-                            
                             # AUTO-STOP LOGIC
-                            # 1. Check Timeout
                             if time.time() - self.medicine_start_time > self.MEDICINE_TIMEOUT:
                                 await self.disable_medicine_mode("Timeout")
                                 await self.line_service.send_message(
                                     "⚠️ แจ้งเตือน: ไม่ได้รับประทานยาตามเวลาที่กำหนด (เกิน 5 นาที)",
                                     alert_type='medicine'
                                 )
-                                
-                            # 2. Check Logic Completion (If using Poom Service)
                             elif hasattr(self.medicine_service, 'state') and self.medicine_service.state in ["COMPLETED", "DONE", 5]:
-                                # Wait a moment to show success message then stop
                                 if time.time() - self.medicine_service.state_start_time > 3.0:
-                                    # Send Success Toast
                                     await self.broadcast_toast("Medicine Taken Successfully!", "success")
                                     await self.disable_medicine_mode("Medicine Taken")
                         
-                        else:
-                            # If inactive, just draw status overlay
-                            pass
-
-                        
+                    # 2. Process Fall Detection (draw on display_frame)
                     if self.fall_service and self.use_fall:
-                        frame_fall = self.fall_service.process(frame)
+                        display_frame = self.fall_service.process(display_frame)
+                        
+                        # Broadcast Fall Alert to Web UI every frame
                         if self.fall_service.any_fall_detected:
-                            print("🚨 FALL DETECTED -> SENDING ALERT")
-                            await self.line_service.send_image(
-                                frame_fall,
-                                "🚨 แจ้งเตือน: ตรวจพบคนล้ม! (Fall Detected)",
-                                alert_type='fall'
-                            )
-                            # TTS Alert for Fall
-                            if self.tts_service:
-                                tts_audio = await self.tts_service.synthesize("แจ้งเตือน ตรวจพบการล้มค่ะ Warning! Fall Detected.")
-                                if tts_audio:
-                                    # Play on Server PC
-                                    self._play_audio_locally(tts_audio)
-                                    # Also send to Pi
-                                    try: await self.ws.send_bytes(bytes([12]) + tts_audio)
-                                    except: pass
+                            await self.broadcast_fall_alert(True)
+                            
+                            # LINE/TTS alerts with cooldown
+                            if (time.time() - self.last_fall_alert_time > self.FALL_ALERT_COOLDOWN):
+                                self.last_fall_alert_time = time.time()
+                                # LINE notification (DISABLED)
+                                # await self.line_service.send_image(
+                                #     display_frame,
+                                #     "🚨 แจ้งเตือน: ตรวจพบคนล้ม! (Fall Detected)",
+                                #     alert_type='fall'
+                                # )
+                                if self.tts_service:
+                                    tts_audio = await self.tts_service.synthesize("แจ้งเตือน ตรวจพบการล้มค่ะ Warning! Fall Detected.")
+                                    if tts_audio:
+                                        self._play_audio_locally(tts_audio)
+                        else:
+                            # Send False when not falling to hide alert
+                            await self.broadcast_fall_alert(False)
                     
-                    # Draw face results if available
-                    # Draw face results if available
+                    # 3. Draw Face Results (draw on display_frame)
                     if self.face_service and self.use_face:
                         for (x, y, w, h, name) in self.face_service.get_results():
-                            cv2.rectangle(frame_face, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                            cv2.putText(frame_face, name, (x, y-10), 
+                            cv2.rectangle(display_frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+                            cv2.putText(display_frame, name, (x, y-10), 
                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
                     
                     # Calculate FPS
@@ -170,42 +165,18 @@ class PiHandler:
                     fps = 1 / (curr_time - prev_time) if (curr_time - prev_time) > 0 else 0
                     prev_time = curr_time
                     
-                    # Draw FPS on all frames
-                    frames_to_show = [(frame_med, "Medicine")]
-                    if self.fall_service:
-                        frames_to_show.append((frame_fall, "Fall"))
-                    if self.face_service:
-                        frames_to_show.append((frame_face, "Face"))
-                        
-                    for img, label in frames_to_show:
-                        cv2.putText(img, f"{label} | FPS: {fps:.1f}", (10, 30),
-                                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+                    # Draw FPS
+                    cv2.putText(display_frame, f"FPS: {fps:.1f}", (10, 30),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
                     
-                    # Show windows
-                    try:
-                        # PERSISTENT STATUS BAR
-                        h, w = frame_med.shape[:2]
-                        cv2.rectangle(frame_med, (0, h-40), (w, h), (0, 0, 0), -1)
-                        status_text = f"[1] FACE: {'ON' if self.use_face else 'OFF'}  |  [2] FALL: {'ON' if self.use_fall else 'OFF'}  |  [3] MED: {'ON' if self.use_med else 'OFF'}"
-                        cv2.putText(frame_med, status_text, (20, h-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-
-                        cv2.imshow("Screen 1: Main View", frame_med)
-                        if self.fall_service:
-                            cv2.imshow("Screen 2: Fall Detection", frame_fall)
-                        if self.face_service:
-                            cv2.imshow("Screen 3: Face Recognition", frame_face)
-                        
-                        key = cv2.waitKey(1) & 0xFF
-                        if key == ord('q'):
-                            break
-                        elif key == ord('1'): self.use_face = not self.use_face
-                        elif key == ord('2'): self.use_fall = not self.use_fall
-                        elif key == ord('3'): self.use_med = not self.use_med
-                    except Exception as e:
-                        print(f"Display Error: {e}")
+                    # Add status bar
+                    h, w = display_frame.shape[:2]
+                    cv2.rectangle(display_frame, (0, h-40), (w, h), (0, 0, 0), -1)
+                    status_text = f"FACE: {'ON' if self.use_face else 'OFF'}  |  FALL: {'ON' if self.use_fall else 'OFF'}  |  MED: {'ON' if self.use_med else 'OFF'}"
+                    cv2.putText(display_frame, status_text, (20, h-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
                     
-                    # Broadcast to web clients (send medicine frame)
-                    await self._broadcast_frame(frame_med)
+                    # Broadcast to web clients
+                    await self._broadcast_frame(display_frame)
 
                 elif msg.type == aiohttp.WSMsgType.TEXT:
                     try:
@@ -258,20 +229,21 @@ class PiHandler:
                                     if tts_audio:
                                         # Play on Server PC
                                         self._play_audio_locally(tts_audio)
-                                        try:
-                                            print(f"📤 Sending TTS to Pi ({len(tts_audio)} bytes)")
-                                            await ws.send_bytes(bytes([12]) + tts_audio)
-                                        except Exception as e:
-                                            print(f"Failed to send TTS to Pi: {e}")
+                                        # Send to Pi (DISABLED)
+                                        # try:
+                                        #     print(f"📤 Sending TTS to Pi ({len(tts_audio)} bytes)")
+                                        #     await ws.send_bytes(bytes([12]) + tts_audio)
+                                        # except Exception as e:
+                                        #     print(f"Failed to send TTS to Pi: {e}")
                                         
-                                        # Also broadcast to Web
-                                        if self.web_clients:
-                                            web_audio_msg = bytes([12]) + tts_audio
-                                            for client in self.web_clients:
-                                                try:
-                                                    await client.send_bytes(web_audio_msg)
-                                                except Exception:
-                                                    pass
+                                        # Also broadcast to Web (DISABLED)
+                                        # if self.web_clients:
+                                        #     web_audio_msg = bytes([12]) + tts_audio
+                                        #     for client in self.web_clients:
+                                        #         try:
+                                        #             await client.send_bytes(web_audio_msg)
+                                        #         except Exception:
+                                        #             pass
                                 
                     except Exception as e:
                         print(f"JSON Parse Error: {e}")
@@ -286,10 +258,6 @@ class PiHandler:
         finally:
             sender_task.cancel()
             audio_task.cancel()
-            try:
-                cv2.destroyAllWindows()
-            except Exception:
-                pass
             print("🔴 Pi Disconnected")
             await self.broadcast_robot_status(False)
             await self.broadcast_toast("Robot Disconnected", "error")
@@ -322,16 +290,16 @@ class PiHandler:
                     # Convert raw bytes to AudioData
                     audio_data = sr.AudioData(bytes(self.audio_buffer), 16000, 2)
                     
-                    # 1. Send Audio to Web for Playback (WAV)
-                    wav_data = audio_data.get_wav_data()
-                    if self.web_clients:
-                        # Header=12 (MSG_AUDIO) + WAV data
-                        audio_msg = bytes([12]) + wav_data
-                        for client in self.web_clients:
-                            try:
-                                await client.send_bytes(audio_msg)
-                            except Exception:
-                                pass
+                    # 1. Send Audio to Web for Playback (WAV) (DISABLED)
+                    # wav_data = audio_data.get_wav_data()
+                    # if self.web_clients:
+                    #     # Header=12 (MSG_AUDIO) + WAV data
+                    #     audio_msg = bytes([12]) + wav_data
+                    #     for client in self.web_clients:
+                    #         try:
+                    #             await client.send_bytes(audio_msg)
+                    #         except Exception:
+                    #             pass
                     
                     self.audio_buffer = bytearray() # Clear buffer immediately
                     
@@ -378,23 +346,23 @@ class PiHandler:
                                 if tts_audio:
                                     # Play on Server PC
                                     self._play_audio_locally(tts_audio)
-                                    # Send to Pi (Header 12 for Audio)
-                                    try:
-                                        msg = bytes([12]) + tts_audio
-                                        print(f"📤 Sending TTS to Pi ({len(tts_audio)} bytes) [Header 12]")
-                                        await ws.send_bytes(msg)
-                                        print("✅ TTS Sent to Pi successfully")
-                                    except Exception as e:
-                                        print(f"❌ Failed to send TTS to Pi: {e}")
+                                    # Send to Pi (Header 12 for Audio) (DISABLED)
+                                    # try:
+                                    #     msg = bytes([12]) + tts_audio
+                                    #     print(f"📤 Sending TTS to Pi ({len(tts_audio)} bytes) [Header 12]")
+                                    #     await ws.send_bytes(msg)
+                                    #     print("✅ TTS Sent to Pi successfully")
+                                    # except Exception as e:
+                                    #     print(f"❌ Failed to send TTS to Pi: {e}")
                                     
-                                    # Also broadcast to Web so user can hear AI
-                                    if self.web_clients:
-                                        web_audio_msg = bytes([12]) + tts_audio
-                                        for client in self.web_clients:
-                                            try:
-                                                await client.send_bytes(web_audio_msg)
-                                            except Exception:
-                                                pass
+                                    # Also broadcast to Web so user can hear AI (DISABLED)
+                                    # if self.web_clients:
+                                    #     web_audio_msg = bytes([12]) + tts_audio
+                                    #     for client in self.web_clients:
+                                    #         try:
+                                    #             await client.send_bytes(web_audio_msg)
+                                    #         except Exception:
+                                    #             pass
                                 else:
                                     print("⚠️ TTS Synthesis returned empty audio")
                             else:
@@ -418,6 +386,16 @@ class PiHandler:
             # print(f"STT Error: {e}") # Usually "UnknownValueError" if speech not clear
             return None
             
+    async def broadcast_fall_alert(self, fall_detected: bool):
+        """Send Fall Alert to Web Clients"""
+        # Header 22 = FALL_ALERT
+        payload = json.dumps({"type": "fall_alert", "fall_detected": fall_detected}).encode('utf-8')
+        msg = bytes([22]) + payload
+        
+        for client in set(self.web_clients):
+            try: await client.send_bytes(msg)
+            except: pass
+
     async def broadcast_toast(self, message, type="info"):
         """Send Toast notification to Web Clients"""
         # Protocol: Type 20 = JSON Toast
@@ -485,12 +463,14 @@ class PiHandler:
         print("🧪 Generating Test Audio...")
         tts_audio = await self.tts_service.synthesize("ระบบทดสอบเสียง พร้อมใช้งานค่ะ")
         if tts_audio:
-            try:
-                msg = bytes([12]) + tts_audio
-                print(f"📤 Sending Test Audio to Pi ({len(tts_audio)} bytes)")
-                await self.ws.send_bytes(msg)
-            except Exception as e:
-                print(f"❌ Test Audio Send Failed: {e}")
+            # Send to Pi (DISABLED)
+            # try:
+            #     msg = bytes([12]) + tts_audio
+            #     print(f"📤 Sending Test Audio to Pi ({len(tts_audio)} bytes)")
+            #     await self.ws.send_bytes(msg)
+            # except Exception as e:
+            #     print(f"❌ Test Audio Send Failed: {e}")
+            pass
     
     async def enable_medicine_mode(self):
         """Turn on Medicine Detection"""
@@ -510,9 +490,9 @@ class PiHandler:
             if tts_audio:
                 # Play on Server PC
                 self._play_audio_locally(tts_audio)
-                # Send to Pi
-                try: await self.ws.send_bytes(bytes([12]) + tts_audio)
-                except: pass
+                # Send to Pi (DISABLED)
+                # try: await self.ws.send_bytes(bytes([12]) + tts_audio)
+                # except: pass
 
     async def disable_medicine_mode(self, reason="Stop"):
         """Turn off Medicine Detection"""

@@ -59,9 +59,13 @@ class FallService:
                 half=(self.device == 'cuda')
             )[0]
             
+            # Get current visible track IDs
+            current_track_ids = set()
+            
             if results.boxes.id is not None:
                 boxes = results.boxes.xyxy.cpu().numpy()
                 track_ids = results.boxes.id.int().cpu().tolist()
+                current_track_ids = set(track_ids)
                 keypoints = results.keypoints.data.cpu().numpy() if results.keypoints is not None else []
                 
                 for i, track_id in enumerate(track_ids):
@@ -109,7 +113,8 @@ class FallService:
                     if is_currently_falling:
                         self.fall_counters[track_id] += 1
                     else:
-                        self.fall_counters[track_id] = max(0, self.fall_counters[track_id] - 1)
+                        # Decrease faster (-2) to quickly reset when not falling
+                        self.fall_counters[track_id] = max(0, self.fall_counters[track_id] - 2)
                         
                     # Update State
                     if self.fall_counters[track_id] >= FALL_CONFIRM_FRAMES:
@@ -136,6 +141,12 @@ class FallService:
 
         except Exception as e:
             # print(f"Fall Process Error: {e}")
-            pass
+            current_track_ids = set()  # Clear all on error
+            
+        # Clear fall state for track IDs no longer visible
+        stale_ids = [tid for tid in self.is_falling_state.keys() if tid not in current_track_ids]
+        for tid in stale_ids:
+            self.is_falling_state[tid] = False
+            self.fall_counters[tid] = 0
             
         return frame_result

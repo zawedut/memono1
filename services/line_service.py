@@ -31,7 +31,7 @@ class LineService:
     async def send_message(self, text, alert_type=None):
         """Send a text message"""
         if alert_type and not self._can_send(alert_type):
-            print(f"⏳ Line Alert Cooldown: {alert_type}")
+            # Silently ignore during cooldown
             return
 
         payload = {
@@ -43,7 +43,7 @@ class LineService:
     async def send_image(self, frame, text, alert_type=None):
         """Upload image to ImgBB and send as image message"""
         if alert_type and not self._can_send(alert_type):
-            print(f"⏳ Line Alert Cooldown: {alert_type}")
+            # Silently ignore during cooldown
             return
 
         print(f"📤 Uploading Image for {alert_type}...")

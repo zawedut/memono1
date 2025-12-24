@@ -36,12 +36,29 @@ class WebHandler:
                             if payload == "TEST_AUDIO":  # Special test command
                                 print("🔊 Triggering Test Audio to Pi...")
                                 if self.pi_handler:
-                                    await self.pi_handler.send_test_audio()
+                                    print("PiHandler is available")
+                                    # await self.pi_handler.send_test_audio()
                             
                             elif payload == "START_MEDICINE":
                                 print("⏰ Triggering Medicine Mode (Scheduler)...")
                                 if self.pi_handler:
                                     await self.pi_handler.enable_medicine_mode()
+                            
+                            # AI Feature Toggles
+                            elif payload == "TOGGLE_FACE":
+                                if self.pi_handler:
+                                    self.pi_handler.use_face = not self.pi_handler.use_face
+                                    print(f"👤 Face Recognition: {'ON' if self.pi_handler.use_face else 'OFF'}")
+                                    
+                            elif payload == "TOGGLE_FALL":
+                                if self.pi_handler:
+                                    self.pi_handler.use_fall = not self.pi_handler.use_fall
+                                    print(f"⚠️ Fall Detection: {'ON' if self.pi_handler.use_fall else 'OFF'}")
+                                    
+                            elif payload == "TOGGLE_MED":
+                                if self.pi_handler:
+                                    self.pi_handler.use_med = not self.pi_handler.use_med
+                                    print(f"💊 Medicine Tracking: {'ON' if self.pi_handler.use_med else 'OFF'}")
                                     
                             else: # Normal Robot control command
                                 print(f"🎮 Command: {payload}")
@@ -70,25 +87,25 @@ class WebHandler:
         ai_response = await self.chat_service.chat(user_message)
         print(f"🤖 AI: {ai_response}")
         
-        # Send text response back to web client
-        text_msg = bytes([MSG_TEXT]) + ai_response.encode('utf-8')
+        # Send text response back to web client (with AI: prefix for proper alignment)
+        text_msg = bytes([MSG_TEXT]) + f"AI: {ai_response}".encode('utf-8')
         await ws.send_bytes(text_msg)
         
-        # Generate TTS audio if available
-        if self.tts_service:
-            audio_data = await self.tts_service.synthesize(ai_response)
-            if audio_data:
-                audio_msg = bytes([MSG_AUDIO]) + audio_data
-                
-                # Send to web client
-                await ws.send_bytes(audio_msg)
-                print(f"🔊 Sent audio to Web ({len(audio_data)} bytes)")
-                
-                # ALSO send to Pi if PiHandler has an active connection
-                if self.pi_handler and hasattr(self.pi_handler, 'ws') and self.pi_handler.ws:
-                    try:
-                        await self.pi_handler.ws.send_bytes(audio_msg)
-                        print(f"📤 Sent audio to Pi ({len(audio_data)} bytes)")
-                    except Exception as e:
-                        print(f"⚠️ Failed to send audio to Pi: {e}")
+        # Generate TTS audio if available (DISABLED)
+        # if self.tts_service:
+        #     audio_data = await self.tts_service.synthesize(ai_response)
+        #     if audio_data:
+        #         audio_msg = bytes([MSG_AUDIO]) + audio_data
+        #         
+        #         # Send to web client
+        #         await ws.send_bytes(audio_msg)
+        #         print(f"🔊 Sent audio to Web ({len(audio_data)} bytes)")
+        #         
+        #         # ALSO send to Pi if PiHandler has an active connection (DISABLED)
+        #         # if self.pi_handler and hasattr(self.pi_handler, 'ws') and self.pi_handler.ws:
+        #         #     try:
+        #         #         await self.pi_handler.ws.send_bytes(audio_msg)
+        #         #         print(f"📤 Sent audio to Pi ({len(audio_data)} bytes)")
+        #         #     except Exception as e:
+        #         #         print(f"⚠️ Failed to send audio to Pi: {e}")
 

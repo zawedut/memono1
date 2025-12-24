@@ -53,6 +53,10 @@ class LocalRobotHandler:
         self.medicine_start_time = 0
         self.MEDICINE_TIMEOUT = 180
         
+        # Fall Alert Cooldown (configurable)
+        self.last_fall_alert_time = 0
+        self.FALL_ALERT_COOLDOWN = 5  # 5 seconds cooldown for LINE alerts
+        
         # Toggles
         self.use_face = True
         self.use_fall = True
@@ -129,7 +133,7 @@ class LocalRobotHandler:
         
     async def run_camera_loop(self):
         print("📷 Opening Webcam...")
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(1)
         self.cap.set(3, 640)
         self.cap.set(4, 480)
         
@@ -175,9 +179,19 @@ class LocalRobotHandler:
                  # Calculate fall on MAIN FRAME (frame_med) so we can see result
                  frame_med = self.fall_service.process(frame_med)
                  
+                 # Broadcast Fall Alert to Web UI every frame
                  if self.fall_service.any_fall_detected:
-                      print("🚨 SIM: FALL DETECTED")
-                      await self.line_service.send_image(frame_med, "🚨 SIM: Fall Detected!", alert_type='fall')
+                      await self.broadcast_fall_alert(True)
+                      
+                      # LINE alerts with cooldown
+                      if (time.time() - self.last_fall_alert_time > self.FALL_ALERT_COOLDOWN):
+                           self.last_fall_alert_time = time.time()
+                           print("🚨 SIM: FALL DETECTED (Alert Sent)")
+                           # LINE notification (DISABLED)
+                           # await self.line_service.send_image(frame_med, "🚨 SIM: Fall Detected!", alert_type='fall')
+                 else:
+                      # Send False when not falling to hide alert
+                      await self.broadcast_fall_alert(False)
 
 
             # --- DRAW RESULTS ---
@@ -210,8 +224,8 @@ class LocalRobotHandler:
                 self.web_clients -= disconnected
             
             # Show CV2 Window (Optional)
-            # Show CV2 Window
-            cv2.imshow("MEMO-BOT Simulator", frame_med)
+            # Show CV2 Window (DISABLED to save resources - use Web UI instead)
+            # cv2.imshow("MEMO-BOT Simulator", frame_med)
             
             key = cv2.waitKey(1) & 0xFF
             if key == ord('q'):
@@ -241,6 +255,24 @@ class LocalRobotHandler:
 
     async def send_test_audio(self):
          await self.speak("Test Audio System OK")
+
+    async def broadcast_fall_alert(self, fall_detected: bool):
+        """Send Fall Alert to Web Clients"""
+        # Header 22 = FALL_ALERT
+        payload = json.dumps({"type": "fall_alert", "fall_detected": fall_detected}).encode('utf-8')
+        msg = bytes([22]) + payload
+        for client in set(self.web_clients):
+            try: await client.send_bytes(msg)
+            except: pass
+
+    async def broadcast_robot_status(self, connected: bool):
+        """Send Robot Status to Web Clients"""
+        # Header 21 = ROBOT_STATUS
+        payload = json.dumps({"type": "status", "robot_connected": connected}).encode('utf-8')
+        msg = bytes([21]) + payload
+        for client in set(self.web_clients):
+            try: await client.send_bytes(msg)
+            except: pass
 
     async def broadcast_toast(self, message, type="info"):
         payload = json.dumps({"type": "toast", "message": message, "level": type}).encode('utf-8')

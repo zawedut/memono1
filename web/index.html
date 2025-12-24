@@ -132,6 +132,8 @@
             justify-content: center;
             align-items: center;
             width: 100%;
+            height: 100%;
+            position: relative;
         }
 
         #video-canvas {
@@ -461,6 +463,109 @@
                 opacity: 1;
             }
         }
+
+        /* === AI TOGGLE SWITCHES === */
+        .ai-controls {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .toggle-label {
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e0;
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        input:checked+.toggle-slider {
+            background-color: var(--success-color);
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        /* === FALL ALERT OVERLAY === */
+        .fall-alert-overlay {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(220, 38, 38, 0.9);
+            color: white;
+            padding: 15px 40px;
+            border-radius: 12px;
+            font-size: 2rem;
+            font-weight: 700;
+            z-index: 100;
+            display: none;
+            animation: pulse 0.5s infinite alternate;
+            box-shadow: 0 4px 20px rgba(220, 38, 38, 0.5);
+            text-align: center;
+        }
+
+        .fall-alert-overlay.visible {
+            display: block;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: translateX(-50%) scale(1);
+                opacity: 0.9;
+            }
+
+            100% {
+                transform: translateX(-50%) scale(1.05);
+                opacity: 1;
+            }
+        }
     </style>
 </head>
 
@@ -487,6 +592,7 @@
             <div class="panel-header">Live Camera</div>
             <div class="video-container">
                 <img id="video-canvas" src="" alt="Waiting for feed..." />
+                <div id="fall-alert" class="fall-alert-overlay">⚠️ FALL DETECTED</div>
             </div>
         </div>
 
@@ -507,6 +613,42 @@
                     <button class="btn-control" onclick="sendCommand('WALK_BACKWARD')"><i
                             class="fas fa-arrow-down"></i></button>
                     <div></div>
+                </div>
+            </div>
+
+            <!-- AI CONTROLS -->
+            <div class="card">
+                <div class="panel-header">🤖 AI Features</div>
+                <div class="ai-controls">
+                    <div class="toggle-row">
+                        <span class="toggle-label">👤 Face Recognition</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-face" checked onchange="toggleAI('FACE', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label">⚠️ Fall Detection</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-fall" checked onchange="toggleAI('FALL', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row">
+                        <span class="toggle-label">💊 Medicine Tracking</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-med" checked onchange="toggleAI('MED', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-row" style="background: #fff5f5;">
+                        <span class="toggle-label">🚨 Fall Alert UI</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="toggle-fall-alert" checked
+                                onchange="toggleFallAlertUI(this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -633,7 +775,9 @@
                 else if (header === 10) { // TEXT MESSAGE
                     const dec = new TextDecoder();
                     const text = dec.decode(payload);
-                    addChatMessage(text, text.startsWith("AI:") ? 'ai' : 'user');
+                    // Detect message type: AI messages start with "AI:", everything else is user
+                    const isAI = text.startsWith("AI:");
+                    addChatMessage(text, isAI ? 'ai' : 'user');
                 }
                 else if (header === 12 && audioEnabled) { // AUDIO (WAV)
                     const blob = new Blob([payload], { type: "audio/wav" });
@@ -664,11 +808,46 @@
                         }
                     } catch (e) { }
                 }
+                else if (header === 22) { // FALL ALERT
+                    try {
+                        const dec = new TextDecoder();
+                        const msg = JSON.parse(dec.decode(payload));
+                        const fallAlert = document.getElementById('fall-alert');
+                        if (msg.fall_detected && window.fallAlertEnabled !== false) {
+                            fallAlert.classList.add('visible');
+                            // Reset timeout - auto-hide if no alert received
+                            if (window.fallAlertTimeout) clearTimeout(window.fallAlertTimeout);
+                            window.fallAlertTimeout = setTimeout(() => {
+                                fallAlert.classList.remove('visible');
+                            }, 1000);
+                        } else {
+                            if (window.fallAlertTimeout) clearTimeout(window.fallAlertTimeout);
+                            fallAlert.classList.remove('visible');
+                        }
+                    } catch (e) { }
+                }
             };
         } // End connect()
 
         function sendCommand(cmd) {
             if (ws && ws.readyState === 1) ws.send(new Uint8Array([11, ...new TextEncoder().encode(cmd)]));
+        }
+
+        function toggleAI(feature, enabled) {
+            // Send toggle command: TOGGLE_FACE, TOGGLE_FALL, or TOGGLE_MED
+            const cmd = `TOGGLE_${feature}`;
+            sendCommand(cmd);
+            showToast(`${feature} Detection: ${enabled ? 'ON' : 'OFF'}`, enabled ? 'success' : 'info');
+        }
+
+        function toggleFallAlertUI(enabled) {
+            window.fallAlertEnabled = enabled;
+            const fallAlert = document.getElementById('fall-alert');
+            if (!enabled) {
+                fallAlert.classList.remove('visible');
+                if (window.fallAlertTimeout) clearTimeout(window.fallAlertTimeout);
+            }
+            showToast(`Fall Alert UI: ${enabled ? 'ON' : 'OFF'}`, enabled ? 'success' : 'info');
         }
 
         function addChatMessage(text, type) {
